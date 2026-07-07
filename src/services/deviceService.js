@@ -1,0 +1,116 @@
+// ============================================================================
+// Pyjama DZ Pointeuse: Device Fingerprinting & Anti-Fraud Locking
+// ============================================================================
+import { supabase } from '../lib/supabase';
+
+/**
+ * Generates an SHA-256 hash string
+ */
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Generates a stable, unique device fingerprint for the user's phone/browser
+ */
+export async function getDeviceFingerprint() {
+  // 1. Get or create persistent device UUID in localStorage
+  let storageId = localStorage.getItem('pyjama_device_uuid');
+  if (!storageId) {
+    storageId = 'device_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    localStorage.setItem('pyjama_device_uuid', storageId);
+  }
+
+  // 2. Gather hardware & browser characteristics
+  const nav = window.navigator;
+  const screenRes = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Algiers';
+  const language = nav.language || 'fr-DZ';
+  const userAgent = nav.userAgent || 'unknown';
+  const cores = nav.hardwareConcurrency || 4;
+
+  const rawString = `${storageId}|${screenRes}|${timezone}|${language}|${userAgent}|${cores}`;
+  
+  // Hash to create a clean 64-character hex fingerprint
+  const fingerprint = await sha256(rawString);
+  return fingerprint;
+}
+
+/**
+ * Checks device lock in Supabase profiles table.
+ * If bound_device_id is null -> Binds this phone permanently to the user!
+ * If bound_device_id matches -> Allowed!
+ * If bound_device_id differs -> Throws fraud violation!
+ */
+export async function verifyOrBindDevice(userId) {
+  const currentFingerprint = await getDeviceFingerprint();
+
+  // Fetch user profile
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, status, bound_device_id')
+    .eq('id', userId)
+    .single();
+
+  if (error || !profile) {
+    throw new Error('Profil utilisateur introuvable.');
+  }
+
+  if (profile.status === 'suspended') {
+    throw new Error('COMPTE SUSPENDU : Votre accès au système de pointage a été désactivé par la direction.');
+  }
+
+  if (profile.status === 'pending') {
+    throw new Error('COMPTE EN ATTENTE : Votre compte doit être validé par l\'administrateur avant votre premier pointage.');
+  }
+
+  // Admin/Managers can bypass strict device locking if needed, but let's enforce or check
+  if (profile.role === 'admin') {
+    return {
+      authorized: true,
+      profile,
+      fingerprint: currentFingerprint,
+      isNewBinding: false,
+      message: 'Accès Administrateur vérifié.'
+    };
+  }
+
+  // Scenario 1: First login on this device -> Bind account to phone!
+  if (!profile.bound_device_id) {
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ bound_device_id: currentFingerprint })
+      .eq('id', userId);
+
+    if (updateErr) {
+      throw new Error('Erreur lors de l\'enregistrement de votre appareil.');
+    }
+
+    return {
+      authorized: true,
+      profile: { ...profile, bound_device_id: currentFingerprint },
+      fingerprint: currentFingerprint,
+      isNewBinding: true,
+      message: '🔒 Appareil enregistré avec succès ! Votre compte est désormais lié à ce téléphone.'
+    };
+  }
+
+  // Scenario 2: Device matches bound device -> Authorized!
+  if (profile.bound_device_id === currentFingerprint) {
+    return {
+      authorized: true,
+      profile,
+      fingerprint: currentFingerprint,
+      isNewBinding: false,
+      message: 'Appareil vérifié.'
+    };
+  }
+
+  // Scenario 3: FRAUD ATTEMPT / WRONG PHONE -> Deny access!
+  throw new Error(
+    `🚫 ALERTE SÉCURITÉ : Cet appareil n'est pas reconnu pour le compte de ${profile.full_name}. Vous ne pouvez pointer que depuis votre téléphone personnel enregistré. Si vous avez changé de téléphone, contactez l'administrateur.`
+  );
+}
