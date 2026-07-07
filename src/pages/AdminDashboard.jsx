@@ -214,16 +214,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleSeed}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-sm"
-              title="Créer comptes de test"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Démo / Seed</span>
-            </button>
-
-            <div className="text-right hidden sm:block pl-3 border-l border-slate-200">
+            <div className="text-right hidden sm:block">
               <span className="text-xs font-bold text-slate-800 block">
                 {profile?.full_name || 'Direction'}
               </span>
@@ -266,13 +257,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
               <RefreshCw className="w-4 h-4" />
               <span>Actualiser</span>
             </button>
-            <button
-              onClick={handleExportCSV}
-              className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              <span>Exporter Paie (CSV)</span>
-            </button>
           </div>
         </div>
 
@@ -287,49 +271,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             <button onClick={() => setActionMessage(null)} className="text-xs underline font-semibold">Fermer</button>
           </div>
         )}
-
-        {/* KPI Overview Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase block">En Attente de Validation</span>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-3xl font-black text-amber-600 font-mono">{pendingCount}</span>
-              <UserCheck className="w-8 h-8 text-amber-400" />
-            </div>
-            <span className="text-[11px] text-amber-700 font-semibold mt-1 block">
-              {pendingCount > 0 ? '⚠️ Action requise par l\'admin' : '✅ Tous validés'}
-            </span>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase block">Effectif Total Inscrit</span>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-3xl font-black text-slate-900 font-mono">{employees.length}</span>
-              <Users className="w-8 h-8 text-indigo-400" />
-            </div>
-            <span className="text-[11px] text-slate-500 font-medium mt-1 block">Comptes actifs et en attente</span>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase block">Scans Aujourd'hui</span>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-3xl font-black text-emerald-600 font-mono">{attendanceLogs.length}</span>
-              <Clock className="w-8 h-8 text-emerald-400" />
-            </div>
-            <span className="text-[11px] text-emerald-700 font-semibold mt-1 block">Horodatés par serveur central</span>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <span className="text-xs font-bold text-slate-500 uppercase block">Appareils Liés</span>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-3xl font-black text-teal-600 font-mono">
-                {employees.filter(e => e.bound_device_id).length}
-              </span>
-              <Smartphone className="w-8 h-8 text-teal-400" />
-            </div>
-            <span className="text-[11px] text-slate-500 font-medium mt-1 block">Smartphones verrouillés</span>
-          </div>
-        </div>
 
         {/* EMPLOYEE MANAGEMENT SECTION (WITH VALIDATION BUTTONS) */}
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
