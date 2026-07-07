@@ -217,25 +217,50 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const activeEmployees = employees.filter(e => e.status === 'active');
   const dailySummary = activeEmployees.map(emp => {
     const empLogs = attendanceLogs.filter(l => l.employee_id === emp.id);
-    const isPresent = empLogs.length > 0;
+    const scansCount = empLogs.length;
+    const isPresent = scansCount > 0;
+    
+    // In attendanceLogs, logs are ordered by server_timestamp descending (newest first).
+    // So empLogs[0] is the LATEST (most recent) scan!
+    const latestLog = empLogs[0];
+    const latestAction = latestLog ? (latestLog.action_type || '').toLowerCase() : null;
+    
+    // Current status:
+    // 'absent' if 0 scans
+    // 'in' if latestAction === 'check_in' (or odd scans)
+    // 'out' if latestAction === 'check_out' (or even scans > 0)
+    let currentStatus = 'absent';
+    if (scansCount > 0) {
+      if (latestAction === 'check_in') {
+        currentStatus = 'in';
+      } else {
+        currentStatus = 'out';
+      }
+    }
+
     const firstIn = [...empLogs].reverse().find(l => (l.action_type || '').toLowerCase() === 'check_in');
     const lastOut = empLogs.find(l => (l.action_type || '').toLowerCase() === 'check_out');
     
     return {
       ...emp,
       isPresent,
+      currentStatus,
       firstInTime: firstIn ? new Date(firstIn.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
       lastOutTime: lastOut ? new Date(lastOut.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
-      scansCount: empLogs.length
+      scansCount
     };
   });
 
-  const presentCount = dailySummary.filter(e => e.isPresent).length;
-  const absentCount = dailySummary.filter(e => !e.isPresent).length;
+  const inCount = dailySummary.filter(e => e.currentStatus === 'in').length;
+  const outCount = dailySummary.filter(e => e.currentStatus === 'out').length;
+  const absentCount = dailySummary.filter(e => e.currentStatus === 'absent').length;
 
   const filteredSummary = dailySummary.filter(emp => {
-    if (presenceFilter === 'present') return emp.isPresent;
-    if (presenceFilter === 'absent') return !emp.isPresent;
+    if (presenceFilter === 'in') return emp.currentStatus === 'in';
+    if (presenceFilter === 'out') return emp.currentStatus === 'out';
+    if (presenceFilter === 'absent') return emp.currentStatus === 'absent';
+    // Backwards compatibility if presenceFilter was 'present'
+    if (presenceFilter === 'present') return emp.currentStatus !== 'absent';
     return true;
   });
 
@@ -598,7 +623,10 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 👥 Total Actifs : <span className="font-mono text-slate-900">{activeEmployees.length}</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm text-emerald-800">
-                🟢 Présents : <span className="font-mono text-emerald-700">{presentCount}</span>
+                🟢 En poste : <span className="font-mono text-emerald-700">{inCount}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl shadow-sm text-amber-800">
+                🟡 Sortis / Pause : <span className="font-mono text-amber-700">{outCount}</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl shadow-sm text-rose-800">
                 🔴 Absents : <span className="font-mono text-rose-700">{absentCount}</span>
@@ -622,14 +650,24 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   Tout ({dailySummary.length})
                 </button>
                 <button
-                  onClick={() => setPresenceFilter('present')}
+                  onClick={() => setPresenceFilter('in')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    presenceFilter === 'present'
+                    presenceFilter === 'in' || presenceFilter === 'present'
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                   }`}
                 >
-                  🟢 Présents ({presentCount})
+                  🟢 En poste ({inCount})
+                </button>
+                <button
+                  onClick={() => setPresenceFilter('out')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    presenceFilter === 'out'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  }`}
+                >
+                  🟡 Sortis / Pause ({outCount})
                 </button>
                 <button
                   onClick={() => setPresenceFilter('absent')}
@@ -657,10 +695,17 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs font-medium">
                     {filteredSummary.map((emp) => (
-                      <tr key={emp.id} className={`hover:bg-slate-50 transition-colors ${!emp.isPresent ? 'bg-rose-50/40' : ''}`}>
+                      <tr key={emp.id} className={`hover:bg-slate-50 transition-colors ${
+                        emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
+                        emp.currentStatus === 'out' ? 'bg-amber-50/30' : ''
+                      }`}>
                         <td className="py-3.5 px-4 font-bold text-slate-900">
                           <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${emp.isPresent ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></div>
+                            <div className={`w-2 h-2 rounded-full ${
+                              emp.currentStatus === 'in' ? 'bg-emerald-500' :
+                              emp.currentStatus === 'out' ? 'bg-amber-500' :
+                              'bg-rose-500 animate-pulse'
+                            }`}></div>
                             <span>{emp.full_name || 'Inconnu'}</span>
                           </div>
                         </td>
@@ -668,9 +713,13 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                           {emp.phone || emp.email || '---'}
                         </td>
                         <td className="py-3.5 px-4">
-                          {emp.isPresent ? (
+                          {emp.currentStatus === 'in' ? (
                             <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              🟢 PRÉSENT(E)
+                              🟢 EN POSTE (Présent)
+                            </span>
+                          ) : emp.currentStatus === 'out' ? (
+                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                              🟡 SORTI(E) / PAUSE
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300">
