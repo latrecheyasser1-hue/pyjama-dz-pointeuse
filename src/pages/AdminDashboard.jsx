@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { unlockUserDevice } from '../services/deviceService';
 import { seedDemoAccounts } from '../services/authService';
 import { Users, Clock, Smartphone, Unlock, Download, RefreshCw, Check, Building2, UserCheck, Search, LogOut, Sparkles, Trash2, Ban } from 'lucide-react';
+import EmployeeHistoryModal from '../components/EmployeeHistoryModal';
 
 export default function AdminDashboard({ user, profile, onLogout }) {
   const [employees, setEmployees] = useState([]);
@@ -14,6 +15,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [activeTab, setActiveTab] = useState('employees'); // 'employees' | 'attendance'
   const [attendanceSubTab, setAttendanceSubTab] = useState('summary'); // 'summary' | 'logs'
   const [presenceFilter, setPresenceFilter] = useState('ALL'); // 'ALL' | 'present' | 'absent'
+  const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null);
 
   // Get YYYY-MM-DD specifically in Algeria/Chlef timezone (Africa/Algiers, UTC+1)
   const getAlgiersDateString = (date = new Date()) => {
@@ -690,15 +692,19 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                       <th className="py-3 px-4">Statut ce jour</th>
                       <th className="py-3 px-4">1ère Entrée</th>
                       <th className="py-3 px-4">Dernière Sortie</th>
-                      <th className="py-3 px-4">Total Scans</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs font-medium">
                     {filteredSummary.map((emp) => (
-                      <tr key={emp.id} className={`hover:bg-slate-50 transition-colors ${
-                        emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
-                        emp.currentStatus === 'out' ? 'bg-amber-50/30' : ''
-                      }`}>
+                      <tr
+                        key={emp.id}
+                        onClick={() => setSelectedEmployeeForHistory(emp)}
+                        title="👉 Cliquez pour voir l'historique et la chronologie 24h détaillée"
+                        className={`hover:bg-indigo-50/60 cursor-pointer transition-all ${
+                          emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
+                          emp.currentStatus === 'out' ? 'bg-amber-50/30' : ''
+                        }`}
+                      >
                         <td className="py-3.5 px-4 font-bold text-slate-900">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${
@@ -706,7 +712,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                               emp.currentStatus === 'out' ? 'bg-amber-500' :
                               'bg-rose-500 animate-pulse'
                             }`}></div>
-                            <span>{emp.full_name || 'Inconnu'}</span>
+                            <span className="group-hover:text-indigo-600 underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4 font-mono text-slate-600">
@@ -741,16 +747,11 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                             <span className="text-slate-400">--:--</span>
                           )}
                         </td>
-                        <td className="py-3.5 px-4 font-mono font-bold">
-                          <span className={`px-2 py-1 rounded-lg ${emp.scansCount > 0 ? 'bg-slate-100 text-slate-700' : 'bg-rose-100/50 text-rose-700'}`}>
-                            {emp.scansCount} scan(s)
-                          </span>
-                        </td>
                       </tr>
                     ))}
                     {filteredSummary.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="py-8 text-center text-slate-400 font-medium">
+                        <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">
                           Aucun employé dans cette catégorie pour le {selectedDate}.
                         </td>
                       </tr>
@@ -761,17 +762,25 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </div>
           )}
 
-          {/* TAB 2: CHRONOLOGICAL LOGS FEED */}
+          {/* TAB 2: RAW ATTENDANCE LOGS */}
           {attendanceSubTab === 'logs' && (
-          <div className="overflow-x-auto animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <span>📜 Flux brut des pointages ({attendanceLogs.length})</span>
+                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">
+                  Heure Chlef / Algérie
+                </span>
+              </h3>
+            </div>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
+                <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider bg-slate-50/50">
                   <th className="py-3 px-4">Employé</th>
-                  <th className="py-3 px-4">Téléphone</th>
                   <th className="py-3 px-4">Action</th>
-                  <th className="py-3 px-4">Heure (Chlef / Algérie)</th>
-                  <th className="py-3 px-4">Statut Sécurité</th>
+                  <th className="py-3 px-4">Heure (Chlef)</th>
+                  <th className="py-3 px-4">Message</th>
+                  <th className="py-3 px-4">Sécurité</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-medium">
@@ -780,20 +789,25 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     <td className="py-3.5 px-4 font-bold text-slate-900">
                       {log.profiles?.full_name || 'Inconnu'}
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">
-                      {log.profiles?.phone || log.profiles?.email || '---'}
-                    </td>
                     <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase ${
-                        (log.action_type || '').toLowerCase() === 'check_in'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-indigo-100 text-indigo-800'
+                      <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase border inline-flex items-center gap-1 ${
+                        log.action === 'CHECK_IN'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
                       }`}>
-                        {(log.action_type || '').toLowerCase() === 'check_in' ? '🟢 ENTRÉE' : '🛑 SORTIE'}
+                        {log.action === 'CHECK_IN' ? '🟢 ENTRÉE' : '🟡 SORTIE / PAUSE'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
-                      {new Date(log.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
+                      {new Date(log.server_timestamp).toLocaleTimeString('fr-FR', {
+                        timeZone: 'Africa/Algiers',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600">
+                      {log.notes || 'Pointage normal'}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
@@ -817,6 +831,14 @@ export default function AdminDashboard({ user, profile, onLogout }) {
         )}
 
       </main>
+
+      {/* Employee History Modal */}
+      {selectedEmployeeForHistory && (
+        <EmployeeHistoryModal
+          employee={selectedEmployeeForHistory}
+          onClose={() => setSelectedEmployeeForHistory(null)}
+        />
+      )}
 
       <footer className="py-4 border-t border-slate-200 bg-slate-50 text-center text-xs text-slate-500 mt-auto">
         <span className="font-bold text-slate-700">Pyjama DZ</span> — Portail Direction & Paie (100% Autonome)
