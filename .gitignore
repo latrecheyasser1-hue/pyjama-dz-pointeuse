@@ -1,0 +1,19 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+*.log
+
+# Build outputs
+dist/
+build/
+.next/
+.output/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
