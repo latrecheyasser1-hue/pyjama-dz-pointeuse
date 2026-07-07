@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { unlockUserDevice } from '../services/deviceService';
 import { seedDemoAccounts } from '../services/authService';
-import { Users, Clock, Smartphone, Unlock, Download, RefreshCw, Check, Building2, UserCheck, Search, LogOut, Sparkles } from 'lucide-react';
+import { Users, Clock, Smartphone, Unlock, Download, RefreshCw, Check, Building2, UserCheck, Search, LogOut, Sparkles, Trash2, Ban } from 'lucide-react';
 
 export default function AdminDashboard({ user, profile, onLogout }) {
   const [employees, setEmployees] = useState([]);
@@ -89,6 +89,44 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
       setActionMessage({ type: 'error', text: `Erreur de validation : ${e.message}` });
+    }
+  };
+
+  // 2.2 Suspend / Stop Active Employee
+  const handleSuspendEmployee = async (empId, empName) => {
+    if (!window.confirm(`⚠️ Voulez-vous vraiment bloquer / suspendre l'accès de "${empName}" ?\n\nIl ne pourra plus scanner le QR code jusqu'à réactivation.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'pending' })
+        .eq('id', empId);
+
+      if (error) throw error;
+
+      setActionMessage({ type: 'success', text: `⏸️ L'employé "${empName}" a été bloqué et remis en attente.` });
+      fetchData();
+      setTimeout(() => setActionMessage(null), 5000);
+    } catch (e) {
+      setActionMessage({ type: 'error', text: `Erreur : ${e.message}` });
+    }
+  };
+
+  // 2.3 Delete Employee
+  const handleDeleteEmployee = async (empId, empName) => {
+    if (!window.confirm(`⚠️ Êtes-vous sûr de vouloir supprimer définitivement l'employé "${empName}" ?\n\nCette action supprimera également son compte et son historique.`)) return;
+
+    try {
+      await supabase.from('attendance_logs').delete().eq('employee_id', empId);
+      const { error } = await supabase.from('profiles').delete().eq('id', empId);
+
+      if (error) throw error;
+
+      setActionMessage({ type: 'success', text: `🗑️ L'employé "${empName}" a été supprimé.` });
+      fetchData();
+      setTimeout(() => setActionMessage(null), 5000);
+    } catch (e) {
+      setActionMessage({ type: 'error', text: `Erreur de suppression : ${e.message}` });
     }
   };
 
@@ -389,17 +427,29 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     </td>
 
                     <td className="py-4 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         
                         {/* VALIDATE / APPROVE BUTTON FOR PENDING EMPLOYEES */}
                         {emp.status === 'pending' && (
                           <button
                             onClick={() => handleValidateEmployee(emp.id, emp.full_name)}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
                             title="Autoriser cet employé à scanner"
                           >
-                            <Check className="w-4 h-4" />
-                            <span>Valider / Activer</span>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Valider</span>
+                          </button>
+                        )}
+
+                        {/* SUSPEND / STOP BUTTON FOR ACTIVE EMPLOYEES */}
+                        {emp.status === 'active' && (
+                          <button
+                            onClick={() => handleSuspendEmployee(emp.id, emp.full_name)}
+                            className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
+                            title="Bloquer / Suspendre cet employé"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                            <span>Bloquer / Stop</span>
                           </button>
                         )}
 
@@ -407,13 +457,23 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         {emp.bound_device_id && (
                           <button
                             onClick={() => handleUnlockDevice(emp.id, emp.full_name)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-300 hover:border-red-300 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
+                            className="px-2 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-300 hover:border-blue-300 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
                             title="Réinitialiser l'appareil lié de l'employé"
                           >
                             <Unlock className="w-3.5 h-3.5" />
-                            <span>🔓 Déverrouiller</span>
+                            <span>🔓 Appareil</span>
                           </button>
                         )}
+
+                        {/* DELETE BUTTON FOR ANY EMPLOYEE */}
+                        <button
+                          onClick={() => handleDeleteEmployee(emp.id, emp.full_name)}
+                          className="px-2.5 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
+                          title="Supprimer définitivement cet employé"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Supprimer</span>
+                        </button>
 
                       </div>
                     </td>
