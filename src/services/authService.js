@@ -9,48 +9,95 @@ import { supabase } from '../lib/supabase';
  */
 export async function loginAdminUsername(username, password) {
   if (username !== 'username321' || password !== '765483cr654') {
-    throw new Error('Nom d\'utilisateur ou mot de passe administrateur incorrect.');
+    throw new Error("Nom d'utilisateur ou mot de passe administrateur incorrect.");
   }
 
-  const adminEmail = 'admin@pyjamadz.com';
-  const adminPass = 'pyjamadz2026';
+  const adminEmail = 'admin_user321@pyjamadz.com';
+  const adminPass = 'pyjamadz_admin_765483cr654_secure';
 
-  // Try signing in
+  // 1. Try signing in
   let { data, error } = await supabase.auth.signInWithPassword({
     email: adminEmail,
     password: adminPass
   });
 
-  // If admin account doesn't exist yet, seed/create it automatically
-  if (error) {
-    await seedDemoAccounts();
-    const res = await supabase.auth.signInWithPassword({
-      email: adminEmail,
-      password: adminPass
+  // 2. If login fails, try to create/sign up the admin account
+  if (error || !data?.user) {
+    // Also try the fallback demo email just in case
+    let fallbackRes = await supabase.auth.signInWithPassword({
+      email: 'admin@pyjamadz.com',
+      password: 'pyjamadz2026'
     });
-    data = res.data;
-    error = res.error;
+
+    if (!fallbackRes.error && fallbackRes.data?.user) {
+      data = fallbackRes.data;
+      error = null;
+    } else {
+      // Create the admin account
+      const signUpRes = await supabase.auth.signUp({
+        email: adminEmail,
+        password: adminPass,
+        options: { data: { full_name: 'Directeur Pyjama DZ' } }
+      });
+
+      if (signUpRes.error) {
+        if (signUpRes.error.message.includes('already registered')) {
+          // If already registered but login failed, password might be wrong or email unconfirmed
+          throw new Error("Compte admin déjà existant dans Supabase mais mot de passe ou email non confirmé. Veuillez désactiver 'Confirm email' dans Supabase (Authentication -> Providers -> Email -> Confirm email: OFF).");
+        }
+        throw new Error(`Erreur Supabase lors de la création admin : ${signUpRes.error.message}`);
+      }
+
+      // Try signing in again after signUp
+      const retryRes = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password: adminPass
+      });
+
+      data = retryRes.data;
+      error = retryRes.error;
+    }
   }
 
   if (error || !data?.user) {
-    throw new Error('Erreur d\'authentification administrateur. Veuillez vérifier la connexion Supabase.');
+    const errMsg = error?.message || 'Erreur inconnue';
+    if (errMsg.toLowerCase().includes('email not confirmed') || errMsg.toLowerCase().includes('not confirmed')) {
+      throw new Error("⚠️ ACTION REQUISE DANS SUPABASE : Vous devez désactiver la confirmation d'email ! Allez dans votre tableau de bord Supabase -> Authentication -> Providers -> Email -> désactivez 'Confirm email' (OFF) et sauvegardez.");
+    }
+    throw new Error(`Erreur de connexion Supabase (${errMsg}). Veuillez vérifier votre projet Supabase ou désactiver 'Confirm email' dans Authentication -> Providers -> Email.`);
   }
 
-  // Ensure admin profile has admin role
-  const { data: profile } = await supabase
+  // Ensure admin profile exists in profiles table and has admin role
+  const { data: profile, error: profErr } = await supabase
     .from('profiles')
     .select('id, full_name, role, status, workplace_id, bound_device_id, workplaces(name)')
     .eq('id', data.user.id)
     .single();
 
-  return {
-    user: data.user,
-    profile: profile || {
+  if (!profile || profErr) {
+    // If profile doesn't exist yet in table, insert it!
+    const newAdminProfile = {
       id: data.user.id,
       full_name: 'Directeur Pyjama DZ',
+      email: data.user.email,
+      phone: '0660998877',
       role: 'admin',
       status: 'active'
-    }
+    };
+    await supabase.from('profiles').upsert(newAdminProfile);
+    return { user: data.user, profile: newAdminProfile };
+  }
+
+  // Make sure role is admin
+  if (profile.role !== 'admin' || profile.status !== 'active') {
+    await supabase.from('profiles').update({ role: 'admin', status: 'active' }).eq('id', data.user.id);
+    profile.role = 'admin';
+    profile.status = 'active';
+  }
+
+  return {
+    user: data.user,
+    profile
   };
 }
 

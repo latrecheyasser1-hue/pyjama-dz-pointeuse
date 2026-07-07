@@ -121,6 +121,18 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
+    CREATE POLICY "Users insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE POLICY "Users update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
     CREATE POLICY "Admins manage all profiles" ON profiles FOR ALL USING (
         EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
     );
