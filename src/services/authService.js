@@ -240,7 +240,7 @@ export async function getCurrentSessionAndProfile() {
       id: session.user.id,
       full_name: session.user.email.split('@')[0],
       role: 'employee',
-      status: 'active'
+      status: 'pending'
     }
   };
 }
