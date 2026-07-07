@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { loginOrRegisterEmployeeByPhone } from '../services/authService';
-import { Phone, User, ArrowRight, Loader2, ShieldAlert, Smartphone } from 'lucide-react';
+import { registerEmployeeByPhone, loginEmployeeByPhone } from '../services/authService';
+import { Phone, User, ArrowRight, Loader2, ShieldAlert, Smartphone, UserPlus, LogIn } from 'lucide-react';
 
 export default function EmployeeLogin({ onSuccess }) {
+  const [mode, setMode] = useState('register'); // 'register' | 'login'
   const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,8 +15,13 @@ export default function EmployeeLogin({ onSuccess }) {
     setLoading(true);
 
     try {
-      const { user, profile } = await loginOrRegisterEmployeeByPhone(phone, fullName);
-      if (onSuccess) onSuccess(user, profile);
+      let result;
+      if (mode === 'register') {
+        result = await registerEmployeeByPhone(phone, fullName);
+      } else {
+        result = await loginEmployeeByPhone(phone);
+      }
+      if (onSuccess) onSuccess(result.user, result.profile);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -28,7 +34,7 @@ export default function EmployeeLogin({ onSuccess }) {
       <div className="w-full max-w-md p-6 sm:p-8 bg-white border border-slate-200 rounded-3xl shadow-xl">
         
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
             <Smartphone className="w-8 h-8" />
           </div>
@@ -36,8 +42,36 @@ export default function EmployeeLogin({ onSuccess }) {
             Espace Employé
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Pointeuse Pyjama DZ — Inscription & Connexion
+            Pointeuse Pyjama DZ — Pointage par Code QR
           </p>
+        </div>
+
+        {/* Mode Toggle Tabs */}
+        <div className="grid grid-cols-2 gap-1.5 p-1.5 bg-slate-100 rounded-2xl mb-6">
+          <button
+            type="button"
+            onClick={() => { setMode('register'); setError(null); }}
+            className={`py-2.5 px-4 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'register'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <UserPlus className="w-4 h-4 shrink-0" />
+            <span>📝 Inscription</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('login'); setError(null); }}
+            className={`py-2.5 px-4 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
+              mode === 'login'
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <LogIn className="w-4 h-4 shrink-0" />
+            <span>🔑 Connexion</span>
+          </button>
         </div>
 
         {/* Error Alert */}
@@ -69,26 +103,28 @@ export default function EmployeeLogin({ onSuccess }) {
               />
             </div>
             <span className="text-[11px] text-slate-500 mt-1 block">
-              💡 Sert d'identifiant unique pour votre smartphone.
+              💡 {mode === 'register' ? 'Ce numéro sera votre identifiant unique.' : 'Entrez le numéro de votre compte.'}
             </span>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              Nom et Prénom
-            </label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Ex : Yasser Latreche"
-                required
-                className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white font-medium transition-all"
-              />
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Nom et Prénom
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Ex : Yasser Latreche"
+                  required={mode === 'register'}
+                  className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white font-medium transition-all"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="pt-3">
             <button
@@ -99,11 +135,11 @@ export default function EmployeeLogin({ onSuccess }) {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Connexion en cours...</span>
+                  <span>{mode === 'register' ? 'Création en cours...' : 'Connexion en cours...'}</span>
                 </>
               ) : (
                 <>
-                  <span>Entrer / S'inscrire</span>
+                  <span>{mode === 'register' ? "Créer mon compte" : "Se Connecter"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -111,9 +147,15 @@ export default function EmployeeLogin({ onSuccess }) {
           </div>
 
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-center mt-4">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              <strong className="text-slate-800">Sécurité Pyjama DZ :</strong> Lors de votre première inscription, votre compte sera en attente de validation par l'administrateur.
-            </p>
+            {mode === 'register' ? (
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                <strong className="text-red-600">⚠️ Règle stricte :</strong> Un numéro de téléphone ne peut être inscrit qu'<strong>une seule fois</strong>. Lors de l'inscription, votre compte sera mis en attente de validation par l'administration.
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                💡 <strong className="text-slate-800">Connexion rapide :</strong> Connectez-vous directement avec votre numéro de téléphone si vous êtes déjà inscrit et validé.
+              </p>
+            )}
           </div>
         </form>
 

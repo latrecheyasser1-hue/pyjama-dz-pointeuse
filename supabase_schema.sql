@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
 CREATE INDEX IF NOT EXISTS idx_attendance_employee_date ON attendance_logs (employee_id, scan_time DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_workplace_date ON attendance_logs (workplace_id, scan_time DESC);
 CREATE INDEX IF NOT EXISTS idx_profiles_status ON profiles (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_phone_unique ON profiles (phone) WHERE phone IS NOT NULL;
 
 -- 4. VIEWS
 CREATE OR REPLACE VIEW daily_attendance_summary AS

@@ -101,48 +101,55 @@ export async function loginAdminUsername(username, password) {
   };
 }
 
+function normalizePhone(phone) {
+  if (!phone) return '';
+  let clean = phone.trim().replace(/\D/g, '');
+  if (clean.startsWith('213') && clean.length === 12) {
+    clean = '0' + clean.slice(3);
+  } else if (clean.length === 9 && ['5', '6', '7'].includes(clean[0])) {
+    clean = '0' + clean;
+  }
+  return clean;
+}
+
 /**
- * Employee Login & Registration by Phone Number & Name ONLY
+ * Employee Registration by Phone Number & Name ONLY (Strictly New Accounts)
  */
-export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
-  if (!phone || phone.trim().length < 8) {
+export async function registerEmployeeByPhone(phone, fullName) {
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone || cleanPhone.length < 8) {
     throw new Error('Veuillez entrer un numéro de téléphone valide (ex: 0550123456).');
   }
   if (!fullName || fullName.trim().length < 2) {
     throw new Error('Veuillez entrer votre nom et prénom.');
   }
 
-  const cleanPhone = phone.trim().replace(/\D/g, '');
   const syntheticEmail = `${cleanPhone}@pyjamadz.employee`;
   const syntheticPassword = `phone_auth_${cleanPhone}_dz_secure_2026`;
 
-  // 1. Try signing in first (if employee already registered)
-  let { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+  // 1. STRICT CHECK: Check if phone already exists in profiles table
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone')
+    .eq('phone', cleanPhone)
+    .maybeSingle();
+
+  if (existingProfile) {
+    throw new Error(`❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit au nom de "${existingProfile.full_name}" ! Un numéro ne peut pas être utilisé deux fois.`);
+  }
+
+  // 2. STRICT CHECK: Check if auth account already exists by trying to sign in
+  const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
     email: syntheticEmail,
     password: syntheticPassword
   });
 
   if (!signInErr && signInData?.user) {
-    // Fetch existing profile
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
-      .eq('id', signInData.user.id)
-      .single();
-
-    return {
-      user: signInData.user,
-      profile: existingProfile || {
-        id: signInData.user.id,
-        full_name: fullName.trim(),
-        phone: cleanPhone,
-        role: 'employee',
-        status: 'pending'
-      }
-    };
+    await supabase.auth.signOut();
+    throw new Error(`❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit ! Si vous avez déjà un compte, basculez vers l'onglet "Connexion".`);
   }
 
-  // 2. If login failed, register new employee
+  // 3. Register new employee
   const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
     email: syntheticEmail,
     password: syntheticPassword,
@@ -153,7 +160,7 @@ export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
 
   if (signUpErr) {
     throw new Error(signUpErr.message === 'User already registered'
-      ? 'Ce numéro de téléphone est déjà inscrit ou le mot de passe interne ne correspond pas.'
+      ? `❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit dans le système !`
       : `Erreur d'inscription : ${signUpErr.message}`);
   }
 
@@ -169,7 +176,7 @@ export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
     .single();
   const workplaceId = wp ? wp.id : null;
 
-  // Create new profile with status = 'pending' (requires admin validation!)
+  // Create new profile with status = 'pending'
   const newProfileData = {
     id: signUpData.user.id,
     workplace_id: workplaceId,
@@ -186,6 +193,61 @@ export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
     user: signUpData.user,
     profile: newProfileData
   };
+}
+
+/**
+ * Employee Login by Phone Number ONLY (For Existing Accounts)
+ */
+export async function loginEmployeeByPhone(phone) {
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone || cleanPhone.length < 8) {
+    throw new Error('Veuillez entrer un numéro de téléphone valide (ex: 0550123456).');
+  }
+
+  const syntheticEmail = `${cleanPhone}@pyjamadz.employee`;
+  const syntheticPassword = `phone_auth_${cleanPhone}_dz_secure_2026`;
+
+  // Try signing in
+  const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+    email: syntheticEmail,
+    password: syntheticPassword
+  });
+
+  if (signInErr || !signInData?.user) {
+    throw new Error(`❌ Aucun compte trouvé avec le numéro (${cleanPhone}). Si vous êtes nouveau, basculez vers l'onglet "Inscription".`);
+  }
+
+  // Fetch existing profile
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
+    .eq('id', signInData.user.id)
+    .single();
+
+  return {
+    user: signInData.user,
+    profile: existingProfile || {
+      id: signInData.user.id,
+      full_name: 'Employé',
+      phone: cleanPhone,
+      role: 'employee',
+      status: 'pending'
+    }
+  };
+}
+
+/**
+ * Backward compatibility wrapper
+ */
+export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
+  try {
+    return await loginEmployeeByPhone(phone);
+  } catch (e) {
+    if (fullName) {
+      return await registerEmployeeByPhone(phone, fullName);
+    }
+    throw e;
+  }
 }
 
 /**
