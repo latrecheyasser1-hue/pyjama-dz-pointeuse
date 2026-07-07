@@ -12,6 +12,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL' | 'pending' | 'active'
   const [activeTab, setActiveTab] = useState('employees'); // 'employees' | 'attendance'
+  const [attendanceSubTab, setAttendanceSubTab] = useState('summary'); // 'summary' | 'logs'
+  const [presenceFilter, setPresenceFilter] = useState('ALL'); // 'ALL' | 'present' | 'absent'
 
   const getTodayString = () => new Date().toISOString().split('T')[0];
   const getYesterdayString = () => {
@@ -195,6 +197,32 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   });
 
   const pendingCount = employees.filter(e => e.status === 'pending').length;
+
+  // Daily Attendance & Absence summary calculation
+  const activeEmployees = employees.filter(e => e.status === 'active');
+  const dailySummary = activeEmployees.map(emp => {
+    const empLogs = attendanceLogs.filter(l => l.employee_id === emp.id);
+    const isPresent = empLogs.length > 0;
+    const firstIn = [...empLogs].reverse().find(l => (l.action_type || '').toLowerCase() === 'check_in');
+    const lastOut = empLogs.find(l => (l.action_type || '').toLowerCase() === 'check_out');
+    
+    return {
+      ...emp,
+      isPresent,
+      firstInTime: firstIn ? new Date(firstIn.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null,
+      lastOutTime: lastOut ? new Date(lastOut.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null,
+      scansCount: empLogs.length
+    };
+  });
+
+  const presentCount = dailySummary.filter(e => e.isPresent).length;
+  const absentCount = dailySummary.filter(e => !e.isPresent).length;
+
+  const filteredSummary = dailySummary.filter(emp => {
+    if (presenceFilter === 'present') return emp.isPresent;
+    if (presenceFilter === 'absent') return !emp.isPresent;
+    return true;
+  });
 
   if (loading) {
     return (
@@ -524,7 +552,154 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Sub-tabs and KPI summary */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex-wrap">
+              <button
+                onClick={() => setAttendanceSubTab('summary')}
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
+                  attendanceSubTab === 'summary'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                📊 Bilan & Absences
+              </button>
+              <button
+                onClick={() => setAttendanceSubTab('logs')}
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${
+                  attendanceSubTab === 'logs'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                📜 Historique des Scans ({attendanceLogs.length})
+              </button>
+            </div>
+
+            {/* KPI counters */}
+            <div className="flex items-center gap-3 text-xs font-extrabold flex-wrap">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-700">
+                👥 Total Actifs : <span className="font-mono text-slate-900">{activeEmployees.length}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm text-emerald-800">
+                🟢 Présents : <span className="font-mono text-emerald-700">{presentCount}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-200 rounded-xl shadow-sm text-rose-800">
+                🔴 Absents : <span className="font-mono text-rose-700">{absentCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* TAB 1: SUMMARY & ABSENCES */}
+          {attendanceSubTab === 'summary' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-3 flex-wrap">
+                <span className="text-xs font-extrabold text-slate-500 mr-2">Filtrer par statut :</span>
+                <button
+                  onClick={() => setPresenceFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    presenceFilter === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tout ({dailySummary.length})
+                </button>
+                <button
+                  onClick={() => setPresenceFilter('present')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    presenceFilter === 'present'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                >
+                  🟢 Présents ({presentCount})
+                </button>
+                <button
+                  onClick={() => setPresenceFilter('absent')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    presenceFilter === 'absent'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                  }`}
+                >
+                  🔴 Absents ({absentCount})
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
+                      <th className="py-3 px-4">Employé</th>
+                      <th className="py-3 px-4">Téléphone</th>
+                      <th className="py-3 px-4">Statut ce jour</th>
+                      <th className="py-3 px-4">1ère Entrée</th>
+                      <th className="py-3 px-4">Dernière Sortie</th>
+                      <th className="py-3 px-4">Total Scans</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs font-medium">
+                    {filteredSummary.map((emp) => (
+                      <tr key={emp.id} className={`hover:bg-slate-50 transition-colors ${!emp.isPresent ? 'bg-rose-50/40' : ''}`}>
+                        <td className="py-3.5 px-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${emp.isPresent ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></div>
+                            <span>{emp.full_name || 'Inconnu'}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-slate-600">
+                          {emp.phone || emp.email || '---'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {emp.isPresent ? (
+                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🟢 PRÉSENT(E)
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                              🔴 ABSENT(E) (Aucun pointage)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
+                          {emp.firstInTime ? (
+                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{emp.firstInTime}</span>
+                          ) : (
+                            <span className="text-slate-400">--:--</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
+                          {emp.lastOutTime ? (
+                            <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{emp.lastOutTime}</span>
+                          ) : (
+                            <span className="text-slate-400">--:--</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold">
+                          <span className={`px-2 py-1 rounded-lg ${emp.scansCount > 0 ? 'bg-slate-100 text-slate-700' : 'bg-rose-100/50 text-rose-700'}`}>
+                            {emp.scansCount} scan(s)
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredSummary.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="py-8 text-center text-slate-400 font-medium">
+                          Aucun employé dans cette catégorie pour le {selectedDate}.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CHRONOLOGICAL LOGS FEED */}
+          {attendanceSubTab === 'logs' && (
+          <div className="overflow-x-auto animate-fade-in">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
@@ -573,6 +748,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
               </tbody>
             </table>
           </div>
+          )}
         </div>
         )}
 
