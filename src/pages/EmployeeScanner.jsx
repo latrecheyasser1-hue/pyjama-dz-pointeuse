@@ -376,38 +376,8 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
                     <span>🛑 Fermer Caméra</span>
                   </button>
                 )}
-
-                {/* PC Demo Simulator Button */}
-                <button
-                  onClick={handleSimulateScan}
-                  disabled={loadingAction}
-                  className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold rounded-2xl text-xs transition-all shadow-sm flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4 text-emerald-600" />
-                  <span>✨ Simuler Pointage (Démo PC sans Caméra)</span>
-                </button>
               </div>
 
-            </div>
-
-            {/* Today's KPI Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center">
-                <span className="text-[11px] font-bold text-slate-500 uppercase block">Heures Aujourd'hui</span>
-                <span className="text-xl font-black text-slate-900 mt-1 block font-mono">{summary.totalHours || '0.00'} h</span>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center">
-                <span className="text-[11px] font-bold text-slate-500 uppercase block">Premier Arrivé</span>
-                <span className="text-sm font-black text-slate-900 mt-1 block font-mono">{summary.checkInTime || '--:--'}</span>
-              </div>
-
-              <div className="col-span-2 sm:col-span-1 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center">
-                <span className="text-[11px] font-bold text-slate-500 uppercase block">Sécurité TOTP</span>
-                <span className="text-xs font-black text-emerald-600 mt-1.5 block flex items-center justify-center gap-1">
-                  <ShieldCheck className="w-4 h-4" /> Actif (30s)
-                </span>
-              </div>
             </div>
           </>
         )}
