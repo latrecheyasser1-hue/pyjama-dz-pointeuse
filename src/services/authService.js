@@ -4,7 +4,145 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Login with Email and Password
+ * Admin Login with Custom Username & Password
+ * Username: username321 / Password: 765483cr654
+ */
+export async function loginAdminUsername(username, password) {
+  if (username !== 'username321' || password !== '765483cr654') {
+    throw new Error('Nom d\'utilisateur ou mot de passe administrateur incorrect.');
+  }
+
+  const adminEmail = 'admin@pyjamadz.com';
+  const adminPass = 'pyjamadz2026';
+
+  // Try signing in
+  let { data, error } = await supabase.auth.signInWithPassword({
+    email: adminEmail,
+    password: adminPass
+  });
+
+  // If admin account doesn't exist yet, seed/create it automatically
+  if (error) {
+    await seedDemoAccounts();
+    const res = await supabase.auth.signInWithPassword({
+      email: adminEmail,
+      password: adminPass
+    });
+    data = res.data;
+    error = res.error;
+  }
+
+  if (error || !data?.user) {
+    throw new Error('Erreur d\'authentification administrateur. Veuillez vérifier la connexion Supabase.');
+  }
+
+  // Ensure admin profile has admin role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, full_name, role, status, workplace_id, bound_device_id, workplaces(name)')
+    .eq('id', data.user.id)
+    .single();
+
+  return {
+    user: data.user,
+    profile: profile || {
+      id: data.user.id,
+      full_name: 'Directeur Pyjama DZ',
+      role: 'admin',
+      status: 'active'
+    }
+  };
+}
+
+/**
+ * Employee Login & Registration by Phone Number & Name ONLY
+ */
+export async function loginOrRegisterEmployeeByPhone(phone, fullName) {
+  if (!phone || phone.trim().length < 8) {
+    throw new Error('Veuillez entrer un numéro de téléphone valide (ex: 0550123456).');
+  }
+  if (!fullName || fullName.trim().length < 2) {
+    throw new Error('Veuillez entrer votre nom et prénom.');
+  }
+
+  const cleanPhone = phone.trim().replace(/\D/g, '');
+  const syntheticEmail = `${cleanPhone}@pyjamadz.employee`;
+  const syntheticPassword = `phone_auth_${cleanPhone}_dz_secure_2026`;
+
+  // 1. Try signing in first (if employee already registered)
+  let { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+    email: syntheticEmail,
+    password: syntheticPassword
+  });
+
+  if (!signInErr && signInData?.user) {
+    // Fetch existing profile
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
+      .eq('id', signInData.user.id)
+      .single();
+
+    return {
+      user: signInData.user,
+      profile: existingProfile || {
+        id: signInData.user.id,
+        full_name: fullName.trim(),
+        phone: cleanPhone,
+        role: 'employee',
+        status: 'pending'
+      }
+    };
+  }
+
+  // 2. If login failed, register new employee
+  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+    email: syntheticEmail,
+    password: syntheticPassword,
+    options: {
+      data: { full_name: fullName.trim(), phone: cleanPhone }
+    }
+  });
+
+  if (signUpErr) {
+    throw new Error(signUpErr.message === 'User already registered'
+      ? 'Ce numéro de téléphone est déjà inscrit ou le mot de passe interne ne correspond pas.'
+      : `Erreur d'inscription : ${signUpErr.message}`);
+  }
+
+  if (!signUpData?.user) {
+    throw new Error('Impossible de créer le compte employé.');
+  }
+
+  // Fetch default workplace ID
+  const { data: wp } = await supabase
+    .from('workplaces')
+    .select('id')
+    .limit(1)
+    .single();
+  const workplaceId = wp ? wp.id : null;
+
+  // Create new profile with status = 'pending' (requires admin validation!)
+  const newProfileData = {
+    id: signUpData.user.id,
+    workplace_id: workplaceId,
+    full_name: fullName.trim(),
+    email: syntheticEmail,
+    phone: cleanPhone,
+    role: 'employee',
+    status: 'pending'
+  };
+
+  await supabase.from('profiles').upsert(newProfileData);
+
+  return {
+    user: signUpData.user,
+    profile: newProfileData
+  };
+}
+
+/**
+ * Standard Login with Email and Password (fallback / demo)
  */
 export async function loginUser(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -18,27 +156,13 @@ export async function loginUser(email, password) {
       : error.message);
   }
 
-  // Fetch profile
-  const { data: profile, error: profErr } = await supabase
+  const { data: profile } = await supabase
     .from('profiles')
     .select('id, full_name, role, status, workplace_id, bound_device_id, workplaces(name)')
     .eq('id', data.user.id)
     .single();
 
-  if (profErr || !profile) {
-    // Fallback if profile doesn't exist yet
-    return {
-      user: data.user,
-      profile: {
-        id: data.user.id,
-        full_name: data.user.email.split('@')[0],
-        role: 'employee',
-        status: 'active'
-      }
-    };
-  }
-
-  return { user: data.user, profile };
+  return { user: data.user, profile: profile || { id: data.user.id, full_name: data.user.email.split('@')[0], role: 'employee', status: 'active' } };
 }
 
 /**
@@ -58,7 +182,7 @@ export async function getCurrentSessionAndProfile() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, role, status, workplace_id, bound_device_id, workplaces(name)')
+    .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
     .eq('id', session.user.id)
     .single();
 
@@ -75,32 +199,24 @@ export async function getCurrentSessionAndProfile() {
 }
 
 /**
- * Seeding Demo Accounts (Admin & Employee) for Instant Testing!
- * This uses standard Supabase Auth Sign Up.
+ * Seeding Demo Accounts (Admin & Employee)
  */
 export async function seedDemoAccounts() {
-  // 1. Fetch default workplace
   const { data: wp } = await supabase
     .from('workplaces')
     .select('id')
     .eq('name', 'Siège Principal Alger - Pyjama DZ')
     .single();
-
   const workplaceId = wp ? wp.id : null;
 
-  // 2. Create Demo Employee: yasser@pyjamadz.com / dz2026
-  let employeeResult = 'Compte employé déjà existant';
+  // Demo Employee
   try {
     const { data: empData, error: empErr } = await supabase.auth.signUp({
       email: 'yasser@pyjamadz.com',
       password: 'pyjamadz2026',
-      options: {
-        data: { full_name: 'Yasser Latreche' }
-      }
+      options: { data: { full_name: 'Yasser Latreche' } }
     });
-
     if (!empErr && empData?.user) {
-      // Ensure profile exists and is active
       await supabase.from('profiles').upsert({
         id: empData.user.id,
         workplace_id: workplaceId,
@@ -110,23 +226,16 @@ export async function seedDemoAccounts() {
         role: 'employee',
         status: 'active'
       });
-      employeeResult = 'Employé créé avec succès !';
     }
-  } catch (e) {
-    console.log('Employee seed info:', e);
-  }
+  } catch (e) { console.log(e); }
 
-  // 3. Create Demo Admin: admin@pyjamadz.com / dz2026
-  let adminResult = 'Compte admin déjà existant';
+  // Demo Admin
   try {
     const { data: admData, error: admErr } = await supabase.auth.signUp({
       email: 'admin@pyjamadz.com',
       password: 'pyjamadz2026',
-      options: {
-        data: { full_name: 'Directeur Pyjama DZ' }
-      }
+      options: { data: { full_name: 'Directeur Pyjama DZ' } }
     });
-
     if (!admErr && admData?.user) {
       await supabase.from('profiles').upsert({
         id: admData.user.id,
@@ -137,14 +246,11 @@ export async function seedDemoAccounts() {
         role: 'admin',
         status: 'active'
       });
-      adminResult = 'Admin créé avec succès !';
     }
-  } catch (e) {
-    console.log('Admin seed info:', e);
-  }
+  } catch (e) { console.log(e); }
 
   return {
-    employee: { email: 'yasser@pyjamadz.com', pass: 'pyjamadz2026', status: employeeResult },
-    admin: { email: 'admin@pyjamadz.com', pass: 'pyjamadz2026', status: adminResult }
+    employee: { email: 'yasser@pyjamadz.com', pass: 'pyjamadz2026', status: 'OK' },
+    admin: { email: 'admin@pyjamadz.com', pass: 'pyjamadz2026', status: 'OK' }
   };
 }

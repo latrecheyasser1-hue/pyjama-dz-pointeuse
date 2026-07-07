@@ -1,0 +1,18 @@
+{
+  "short_name": "Pointeuse DZ",
+  "name": "Pyjama DZ — Système de Pointage PWA",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Système de pointage moderne par QR code dynamique pour les employés Pyjama DZ."
+}

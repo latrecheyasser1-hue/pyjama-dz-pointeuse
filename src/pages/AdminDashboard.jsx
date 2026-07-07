@@ -1,44 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Users, Clock, ShieldAlert, Download, Unlock, Search, Filter, RefreshCw, CheckCircle2, AlertTriangle, UserCheck } from 'lucide-react';
+import { unlockUserDevice } from '../services/deviceService';
+import { Users, ShieldAlert, CheckCircle2, Clock, Smartphone, Unlock, Download, RefreshCw, AlertCircle, Check, Building2, UserCheck, Search } from 'lucide-react';
 
 export default function AdminDashboard({ user, profile }) {
-  const [logs, setLogs] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [actionMessage, setActionMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [unlockingId, setUnlockingId] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL' | 'pending' | 'active'
 
-  // 1. Fetch Logs & Employees
+  // 1. Fetch all employees & today's logs
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch employees
-      const { data: empData, error: empErr } = await supabase
+      // 1.1 Fetch profiles
+      const { data: profs, error: pErr } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, status, bound_device_id, workplaces(name)')
-        .order('full_name', { ascending: true });
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (empData) setEmployees(empData);
+      if (pErr) throw pErr;
+      setEmployees(profs || []);
 
-      // Fetch logs for selected date
-      const startOfDay = new Date(filterDate);
+      // 1.2 Fetch today's logs
+      const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filterDate);
-      endOfDay.setHours(23, 59, 59, 999);
 
-      const { data: logData, error: logErr } = await supabase
+      const { data: logs, error: lErr } = await supabase
         .from('attendance_logs')
-        .select('id, employee_id, action_type, scan_time, device_fingerprint, notes, profiles(full_name, email, role), workplaces(name)')
-        .gte('scan_time', startOfDay.toISOString())
-        .lte('scan_time', endOfDay.toISOString())
-        .order('scan_time', { ascending: false });
+        .select('*, profiles(full_name, phone, email, role)')
+        .gte('server_timestamp', startOfDay.toISOString())
+        .order('server_timestamp', { ascending: false });
 
-      if (logData) setLogs(logData);
+      if (lErr) throw lErr;
+      setAttendanceLogs(logs || []);
     } catch (e) {
-      console.error('Admin fetch err:', e);
+      console.error('Admin fetch error:', e);
     } finally {
       setLoading(false);
     }
@@ -46,352 +45,405 @@ export default function AdminDashboard({ user, profile }) {
 
   useEffect(() => {
     fetchData();
-  }, [filterDate]);
 
-  // 2. Real-Time Subscription (Auto-refresh on scan!)
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin_realtime_logs')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'attendance_logs' },
-        (payload) => {
-          console.log('Realtime new log:', payload);
-          fetchData();
-          setToast('🔔 Nouveau pointage enregistré en temps réel !');
-          setTimeout(() => setToast(null), 5000);
-        }
-      )
+    // Realtime subscription for live attendance updates
+    const subscription = supabase
+      .channel('admin-live-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_logs' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchData();
+      })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(subscription);
     };
-  }, [filterDate]);
+  }, []);
 
-  // 3. Unlock Device Lock for Employee
-  const handleUnlockDevice = async (employeeId, name) => {
-    if (!window.confirm(`Voulez-vous vraiment déverrouiller et réinitialiser l'appareil lié de ${name} ? Il pourra pointer depuis un nouveau téléphone.`)) {
-      return;
-    }
-
-    setUnlockingId(employeeId);
+  // 2. Validate / Approve Pending Employee
+  const handleValidateEmployee = async (empId, empName) => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ bound_device_id: null })
-        .eq('id', employeeId);
+        .update({ status: 'active' })
+        .eq('id', empId);
 
       if (error) throw error;
-      setToast(`🔓 Appareil de ${name} déverrouillé avec succès !`);
-      await fetchData();
+
+      setActionMessage({ type: 'success', text: `✅ L'employé "${empName}" a été validé et peut maintenant pointer !` });
+      fetchData();
+      setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
-      alert(`Erreur: ${e.message}`);
-    } finally {
-      setUnlockingId(null);
-      setTimeout(() => setToast(null), 5000);
+      setActionMessage({ type: 'error', text: `Erreur de validation : ${e.message}` });
+    }
+  };
+
+  // 3. Unlock Device Fingerprint
+  const handleUnlockDevice = async (empId, empName) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir réinitialiser l'appareil lié de "${empName}" ?`)) return;
+
+    try {
+      await unlockUserDevice(empId);
+      setActionMessage({ type: 'success', text: `🔓 Appareil réinitialisé avec succès pour "${empName}". Il pourra lier un nouveau téléphone au prochain scan.` });
+      fetchData();
+      setTimeout(() => setActionMessage(null), 5000);
+    } catch (e) {
+      setActionMessage({ type: 'error', text: e.message });
     }
   };
 
   // 4. Export CSV Report
   const handleExportCSV = () => {
-    if (logs.length === 0) {
-      alert('Aucune donnée à exporter pour cette date.');
+    if (attendanceLogs.length === 0) {
+      alert('Aucun pointage enregistré aujourd\'hui.');
       return;
     }
 
-    const headers = ['ID', 'Employé', 'Email', 'Action', 'Heure (Serveur)', 'Lieu de travail', 'Empreinte Appareil', 'Notes'];
-    const rows = logs.map(l => [
+    const headers = ['ID Pointage', 'Employé', 'Téléphone', 'Type Action', 'Horodatage Serveur (UTC)', 'Statut Vérification'];
+    const rows = attendanceLogs.map(l => [
       l.id,
       l.profiles?.full_name || 'Inconnu',
-      l.profiles?.email || '',
-      l.action_type === 'check_in' ? 'ENTREE' : 'SORTIE',
-      new Date(l.scan_time).toLocaleString('fr-DZ'),
-      l.workplaces?.name || 'Siège',
-      l.device_fingerprint || '',
-      l.notes || ''
+      l.profiles?.phone || l.profiles?.email || '---',
+      l.action_type === 'CHECK_IN' ? 'ENTREE' : 'SORTIE',
+      l.server_timestamp,
+      l.verification_status
     ]);
 
-    let csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.map(x => `"${x}"`).join(','))].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `rapport_pointage_pyjamadz_${filterDate}.csv`);
+    link.setAttribute('download', `pyjamadz_paie_audit_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Filter employees & logs by search
-  const filteredLogs = logs.filter(l => 
-    (l.profiles?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (l.profiles?.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtered employees
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = (emp.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (emp.phone || '').includes(searchTerm) ||
+                          (emp.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+    if (filterStatus === 'ALL') return matchesSearch;
+    return matchesSearch && emp.status === filterStatus;
+  });
 
-  const totalEmployees = employees.length;
-  const boundEmployees = employees.filter(e => e.bound_device_id).length;
-  const presentNow = new Set(logs.filter(l => l.action_type === 'check_in').map(l => l.employee_id)).size;
+  const pendingCount = employees.filter(e => e.status === 'pending').length;
 
-  if (profile?.role !== 'admin' && profile?.role !== 'manager') {
+  if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center text-white">
-        <ShieldAlert className="w-16 h-16 text-red-500 mb-4 animate-bounce" />
-        <h2 className="text-2xl font-bold">Accès Réservé à la Direction</h2>
-        <p className="text-sm text-slate-400 mt-2 max-w-md">
-          Cette section est strictement réservée aux administrateurs et managers de Pyjama DZ.
-        </p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4 text-slate-900">
+        <div className="w-12 h-12 border-4 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin"></div>
+        <p className="text-slate-600 font-bold text-sm">Chargement du panneau d'administration Direction...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8 animate-fade-in">
+    <div className="max-w-7xl mx-auto my-6 px-4 sm:px-6 lg:px-8 space-y-8">
       
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-indigo-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm animate-bounce-short border border-white/20">
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <span>{toast}</span>
+      {/* Top Header */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-sm">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Supervision Direction
+              </h1>
+              <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 font-black text-[11px] rounded-full uppercase">
+                Admin Pyjama DZ
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Gérez les inscriptions des employés, validez les comptes et auditez les pointages en temps réel.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={fetchData}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-slate-300"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Actualiser</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exporter Paie (CSV)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Action Banner Notification */}
+      {actionMessage && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between shadow-sm animate-fade-in ${
+          actionMessage.type === 'success' 
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+            : 'bg-red-50 border-red-200 text-red-900'
+        }`}>
+          <span className="text-xs font-bold">{actionMessage.text}</span>
+          <button onClick={() => setActionMessage(null)} className="text-xs underline font-semibold">Fermer</button>
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
-        <div>
-          <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-full text-xs font-bold uppercase tracking-wider">
-            Supervision Direction
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-white mt-2">
-            Tableau de Bord & Audit En Temps Réel
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Surveillez les pointages des employés, gérez les appareils liés et exportez la paie.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs sm:text-sm rounded-xl border border-slate-700 transition-all flex items-center gap-2 shadow-sm"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
-            <span>Actualiser</span>
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            <span>Exporter CSV</span>
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Stats Cards */}
+      {/* KPI Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
-            <UserCheck className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-bold text-slate-500 uppercase block">En Attente de Validation</span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-3xl font-black text-amber-600 font-mono">{pendingCount}</span>
+            <UserCheck className="w-8 h-8 text-amber-400" />
           </div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-            Présents Actuellement
-          </span>
-          <span className="text-3xl font-black text-white mt-1 block">
-            {presentNow} <span className="text-xs font-normal text-slate-500">/ {totalEmployees}</span>
+          <span className="text-[11px] text-amber-700 font-semibold mt-1 block">
+            {pendingCount > 0 ? '⚠️ Action requise par l\'admin' : '✅ Tous validés'}
           </span>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
-            <Users className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-bold text-slate-500 uppercase block">Effectif Total Inscrit</span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-3xl font-black text-slate-900 font-mono">{employees.length}</span>
+            <Users className="w-8 h-8 text-indigo-400" />
           </div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-            Total Effectif
-          </span>
-          <span className="text-3xl font-black text-white mt-1 block">
-            {totalEmployees} <span className="text-xs font-normal text-slate-500">employés</span>
-          </span>
+          <span className="text-[11px] text-slate-500 font-medium mt-1 block">Comptes actifs et en attente</span>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
-          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 mb-4 group-hover:scale-110 transition-transform">
-            <Clock className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-bold text-slate-500 uppercase block">Scans Aujourd'hui</span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-3xl font-black text-emerald-600 font-mono">{attendanceLogs.length}</span>
+            <Clock className="w-8 h-8 text-emerald-400" />
           </div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-            Pointages Aujourd'hui
-          </span>
-          <span className="text-3xl font-black text-white mt-1 block">
-            {logs.length} <span className="text-xs font-normal text-slate-500">scans</span>
-          </span>
+          <span className="text-[11px] text-emerald-700 font-semibold mt-1 block">Horodatés par serveur central</span>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 group-hover:scale-110 transition-transform">
-            <ShieldAlert className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-bold text-slate-500 uppercase block">Appareils Liés</span>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-3xl font-black text-teal-600 font-mono">
+              {employees.filter(e => e.bound_device_id).length}
+            </span>
+            <Smartphone className="w-8 h-8 text-teal-400" />
           </div>
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-            Appareils Verrouillés
-          </span>
-          <span className="text-3xl font-black text-white mt-1 block">
-            {boundEmployees} <span className="text-xs font-normal text-slate-500">téléphones liés</span>
-          </span>
+          <span className="text-[11px] text-slate-500 font-medium mt-1 block">Smartphones verrouillés</span>
         </div>
-
       </div>
 
-      {/* Main Content Grid: Logs Feed & Employee Device Manager */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Column (8 cols): Live Attendance Feed Table */}
-        <div className="lg:col-span-8 bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-emerald-400" />
-                Journal des Pointages
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Flux en direct certifié par horodatage serveur PostgreSQL.
-              </p>
-            </div>
-
-            {/* Date & Search Filters */}
-            <div className="flex items-center gap-3">
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-emerald-500"
-              />
-              
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Chercher employé..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-40 sm:w-48"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">Employé</th>
-                  <th className="py-3 px-4">Action</th>
-                  <th className="py-3 px-4">Heure Serveur</th>
-                  <th className="py-3 px-4">Lieu</th>
-                  <th className="py-3 px-4">Détails</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 text-xs">
-                {filteredLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-500">
-                      Aucun pointage trouvé pour cette sélection.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLogs.map((log) => {
-                    const isIn = log.action_type === 'check_in';
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-white">
-                          {log.profiles?.full_name || 'Employé Supprimé'}
-                          <span className="block text-[10px] text-slate-400 font-normal">
-                            {log.profiles?.email}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[10px] ${
-                            isIn ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isIn ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                            {isIn ? 'ENTRÉE' : 'SORTIE'}
-                          </span>
-                        </td>
-
-                        <td className="py-3.5 px-4 font-mono font-bold text-emerald-300">
-                          {new Date(log.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-slate-300">
-                          {log.workplaces?.name || 'Siège Principal'}
-                        </td>
-
-                        <td className="py-3.5 px-4 text-[11px] text-slate-400 truncate max-w-[150px]" title={log.notes}>
-                          {log.notes || 'Scan PWA OK'}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Right Column (4 cols): Device Locking & Employee Management */}
-        <div className="lg:col-span-4 bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 self-start">
-          <div className="pb-4 border-b border-slate-800">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-indigo-400" />
-              Verrouillage Téléphones
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Si un employé perd ou change de smartphone, déverrouillez son accès ici.
+      {/* EMPLOYEE MANAGEMENT SECTION (WITH VALIDATION BUTTONS) */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+          <div>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900">
+              Gestion & Validation des Employés
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Exigence : Les employés s'inscrivent par téléphone et doivent être validés par l'admin ici pour pouvoir scanner.
             </p>
           </div>
 
-          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-            {employees.map((emp) => {
-              const isLocked = !!emp.bound_device_id;
-              const isUnlocking = unlockingId === emp.id;
-              return (
-                <div
-                  key={emp.id}
-                  className="p-3.5 rounded-2xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between gap-3 hover:border-slate-600 transition-all"
-                >
-                  <div className="overflow-hidden">
-                    <span className="text-xs font-bold text-white block truncate">
-                      {emp.full_name}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block truncate">
-                      {emp.email}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider mt-1 px-1.5 py-0.5 rounded ${
-                      isLocked ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-700 text-slate-400'
-                    }`}>
-                      {isLocked ? '🔒 Lié au téléphone' : '🔓 Non lié (Libre)'}
-                    </span>
-                  </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher nom, téléphone..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+              />
+            </div>
 
-                  {isLocked && (
-                    <button
-                      onClick={() => handleUnlockDevice(emp.id, emp.full_name)}
-                      disabled={isUnlocking}
-                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[11px] font-bold shrink-0 transition-all flex items-center gap-1 shadow-sm"
-                      title="Réinitialiser l'appareil lié"
-                    >
-                      <Unlock className={`w-3.5 h-3.5 ${isUnlocking ? 'animate-spin' : ''}`} />
-                      <span>{isUnlocking ? '...' : 'Déverrouiller'}</span>
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="ALL">Tous ({employees.length})</option>
+              <option value="pending">⏳ En attente ({pendingCount})</option>
+              <option value="active">✅ Actifs ({employees.filter(e => e.status === 'active').length})</option>
+            </select>
           </div>
         </div>
 
+        {/* Employee Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
+                <th className="py-3 px-4">Employé</th>
+                <th className="py-3 px-4">Téléphone / ID</th>
+                <th className="py-3 px-4">Rôle</th>
+                <th className="py-3 px-4">Statut</th>
+                <th className="py-3 px-4">Appareil Lié</th>
+                <th className="py-3 px-4 text-right">Actions Direction</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {filteredEmployees.map((emp) => (
+                <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
+                  
+                  <td className="py-4 px-4 font-extrabold text-slate-900">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 font-bold flex items-center justify-center shrink-0">
+                        {emp.full_name?.charAt(0) || 'U'}
+                      </div>
+                      <span>{emp.full_name || 'Sans Nom'}</span>
+                    </div>
+                  </td>
+
+                  <td className="py-4 px-4 font-mono font-bold text-slate-700">
+                    {emp.phone || emp.email || '---'}
+                  </td>
+
+                  <td className="py-4 px-4">
+                    <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
+                      emp.role === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {emp.role === 'admin' ? '👑 Admin' : '📱 Employé'}
+                    </span>
+                  </td>
+
+                  <td className="py-4 px-4">
+                    <span className={`px-3 py-1 rounded-full font-extrabold text-[11px] flex items-center gap-1.5 w-fit ${
+                      emp.status === 'active'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${emp.status === 'active' ? 'bg-emerald-600' : 'bg-amber-600'}`}></span>
+                      {emp.status === 'active' ? '✅ Actif' : '⏳ En attente'}
+                    </span>
+                  </td>
+
+                  <td className="py-4 px-4 font-mono text-slate-500">
+                    {emp.bound_device_id ? (
+                      <span className="text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        🔒 Lié ({emp.bound_device_id.slice(0, 8)}...)
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">Non lié</span>
+                    )}
+                  </td>
+
+                  <td className="py-4 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      
+                      {/* VALIDATE / APPROVE BUTTON FOR PENDING EMPLOYEES */}
+                      {emp.status === 'pending' && (
+                        <button
+                          onClick={() => handleValidateEmployee(emp.id, emp.full_name)}
+                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
+                          title="Autoriser cet employé à scanner"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>Valider / Activer</span>
+                        </button>
+                      )}
+
+                      {/* UNLOCK DEVICE BUTTON */}
+                      {emp.bound_device_id && (
+                        <button
+                          onClick={() => handleUnlockDevice(emp.id, emp.full_name)}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-300 hover:border-red-300 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
+                          title="Réinitialiser l'appareil lié de l'employé"
+                        >
+                          <Unlock className="w-3.5 h-3.5" />
+                          <span>🔓 Déverrouiller</span>
+                        </button>
+                      )}
+
+                    </div>
+                  </td>
+
+                </tr>
+              ))}
+              {filteredEmployees.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-slate-400 font-medium">
+                    Aucun employé trouvé.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* LIVE ATTENDANCE LOGS FEED */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900">
+              Flux des Pointages en Temps Réel (Aujourd'hui)
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Horodatage centralisé côté serveur • Aucun risque de triche d'heure
+            </p>
+          </div>
+          <span className="text-xs font-bold font-mono px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span> Live Realtime
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider">
+                <th className="py-3 px-4">Employé</th>
+                <th className="py-3 px-4">Téléphone</th>
+                <th className="py-3 px-4">Action</th>
+                <th className="py-3 px-4">Heure Serveur (UTC)</th>
+                <th className="py-3 px-4">Statut Sécurité</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs font-medium">
+              {attendanceLogs.map((log) => (
+                <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3.5 px-4 font-bold text-slate-900">
+                    {log.profiles?.full_name || 'Inconnu'}
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-slate-600">
+                    {log.profiles?.phone || log.profiles?.email || '---'}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase ${
+                      log.action_type === 'CHECK_IN'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-indigo-100 text-indigo-800'
+                    }`}>
+                      {log.action_type === 'CHECK_IN' ? '🟢 ENTRÉE' : '🛑 SORTIE'}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
+                    {new Date(log.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
+                      ✔ Validé TOTP (30s)
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {attendanceLogs.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">
+                    Aucun pointage enregistré aujourd'hui.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>

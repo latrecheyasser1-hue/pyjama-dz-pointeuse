@@ -1,5 +1,5 @@
 // ============================================================================
-// Pyjama DZ Pointeuse: Dynamic QR Code Service (60-Minute Epoch TOTP)
+// Pyjama DZ Pointeuse: Dynamic QR Code Service (30-Second TOTP)
 // ============================================================================
 
 /**
@@ -13,32 +13,39 @@ async function sha256(message) {
 }
 
 /**
- * Returns the current Epoch Hour (changes automatically every 60 minutes)
+ * Returns the current Epoch for 30-second intervals (changes automatically every 30 seconds)
+ */
+export function getCurrentEpoch30s() {
+  return Math.floor(Date.now() / 30000);
+}
+
+/**
+ * Backward compatible alias for existing components
  */
 export function getCurrentEpochHour() {
-  return Math.floor(Date.now() / (1000 * 60 * 60));
+  return getCurrentEpoch30s();
 }
 
 /**
  * Generates the dynamic QR code string for a given workplace
- * Format: PYJAMA-QR|{workplaceId}|{epochHour}|{hashSignature}
+ * Format: PYJAMA-QR|{workplaceId}|{epoch30s}|{hashSignature}
  */
-export async function generateDynamicQR(workplaceId, secret, epochHour = getCurrentEpochHour()) {
+export async function generateDynamicQR(workplaceId, secret, epoch30s = getCurrentEpoch30s()) {
   if (!workplaceId || !secret) {
-    throw new Error('Workplace ID and Secret are required to generate QR code.');
+    throw new Error('Workplace ID and Secret sont requis pour générer le QR code.');
   }
   
-  const payloadToHash = `${workplaceId}:${secret}:${epochHour}`;
+  const payloadToHash = `${workplaceId}:${secret}:${epoch30s}`;
   const signature = await sha256(payloadToHash);
   
   // Return formatted token string
-  return `PYJAMA-QR|${workplaceId}|${epochHour}|${signature.slice(0, 16)}`;
+  return `PYJAMA-QR|${workplaceId}|${epoch30s}|${signature.slice(0, 16)}`;
 }
 
 /**
  * Validates a scanned QR token string against the workplace secret.
- * Includes a 60-second grace buffer (checks both current epoch hour and previous epoch hour)
- * to prevent false rejections right at the turn of the hour.
+ * Includes a grace buffer (checks current epoch, previous 30s window, and next 30s window)
+ * to prevent false rejections during network lag or slight clock differences.
  */
 export async function validateQRToken(workplaceId, secret, scannedTokenString) {
   if (!scannedTokenString || !scannedTokenString.startsWith('PYJAMA-QR|')) {
@@ -53,8 +60,8 @@ export async function validateQRToken(workplaceId, secret, scannedTokenString) {
     return { valid: false, error: 'QR Code corrompu ou incomplet.' };
   }
 
-  const [prefix, tokenWorkplaceId, tokenEpochHourStr, tokenSig] = parts;
-  const tokenEpochHour = parseInt(tokenEpochHourStr, 10);
+  const [prefix, tokenWorkplaceId, tokenEpochStr, tokenSig] = parts;
+  const tokenEpoch = parseInt(tokenEpochStr, 10);
 
   if (tokenWorkplaceId !== workplaceId) {
     return {
@@ -63,18 +70,18 @@ export async function validateQRToken(workplaceId, secret, scannedTokenString) {
     };
   }
 
-  const currentEpoch = getCurrentEpochHour();
+  const currentEpoch = getCurrentEpoch30s();
   
-  // Check if token epoch is within current hour or previous hour (grace buffer)
-  if (tokenEpochHour !== currentEpoch && tokenEpochHour !== currentEpoch - 1) {
+  // Check if token epoch is within current 30s, previous 30s, or next 30s (grace buffer)
+  if (tokenEpoch !== currentEpoch && tokenEpoch !== currentEpoch - 1 && tokenEpoch !== currentEpoch + 1) {
     return {
       valid: false,
-      error: 'QR Code expiré ! Le code mural change chaque heure. Veuillez scanner le nouveau code.'
+      error: 'QR Code expiré ! Le code mural change toutes les 30 secondes. Veuillez scanner le nouveau code.'
     };
   }
 
   // Verify signature
-  const expectedToken = await generateDynamicQR(workplaceId, secret, tokenEpochHour);
+  const expectedToken = await generateDynamicQR(workplaceId, secret, tokenEpoch);
   const expectedSig = expectedToken.split('|')[3];
 
   if (tokenSig !== expectedSig) {
@@ -87,7 +94,7 @@ export async function validateQRToken(workplaceId, secret, scannedTokenString) {
   return {
     valid: true,
     workplaceId,
-    epochHour: tokenEpochHour,
+    epochHour: tokenEpoch,
     signature: tokenSig
   };
 }

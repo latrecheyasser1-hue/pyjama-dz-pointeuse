@@ -1,193 +1,235 @@
 import React, { useState } from 'react';
-import { loginUser, seedDemoAccounts } from '../services/authService';
-import { Lock, Mail, KeyRound, Sparkles, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { loginAdminUsername, loginOrRegisterEmployeeByPhone } from '../services/authService';
+import { Phone, User, Key, Lock, ShieldAlert, ArrowRight, Loader2, Sparkles, Building2 } from 'lucide-react';
 
 export default function LoginModal({ onSuccess }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [activeTab, setActiveTab] = useState('employee'); // 'employee' | 'admin'
+  
+  // Employee state
+  const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
+
+  // Admin state
+  const [username, setUsername] = useState('username321');
+  const [password, setPassword] = useState('765483cr654');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [seeding, setSeeding] = useState(false);
-  const [seedSuccess, setSeedSuccess] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleEmployeeSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    setLoading(true);
+
     try {
-      const { user, profile } = await loginUser(email, password);
+      const { user, profile } = await loginOrRegisterEmployeeByPhone(phone, fullName);
       if (onSuccess) onSuccess(user, profile);
     } catch (err) {
-      setError(err.message || 'Erreur d\'authentification.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickLogin = (demoEmail, demoPass) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-  };
-
-  const handleSeed = async () => {
-    setSeeding(true);
-    setSeedSuccess(null);
+  const handleAdminSubmit = async (e) => {
+    e.preventDefault();
     setError(null);
+    setLoading(true);
+
     try {
-      const res = await seedDemoAccounts();
-      setSeedSuccess('Comptes de démonstration initialisés et prêts à l\'emploi !');
+      const { user, profile } = await loginAdminUsername(username, password);
+      if (onSuccess) onSuccess(user, profile);
     } catch (err) {
-      setError('Impossible de créer les comptes démo. Vérifiez la connexion Supabase.');
+      setError(err.message);
     } finally {
-      setSeeding(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-        
-        {/* Header Banner */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 p-6 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-white/20 via-transparent to-transparent"></div>
-          <div className="w-16 h-16 bg-slate-900/80 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl border border-white/10">
-            <Lock className="w-8 h-8 text-emerald-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            Connexion au Système
-          </h2>
-          <p className="text-sm text-emerald-100/80 mt-1 font-medium">
-            Pointeuse Sécurisée Pyjama DZ
-          </p>
+    <div className="w-full max-w-md mx-auto my-8 p-6 sm:p-8 bg-white border border-slate-200 rounded-3xl shadow-xl">
+      
+      {/* Header */}
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm">
+          <Building2 className="w-8 h-8" />
         </div>
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+          Pointeuse Pyjama DZ
+        </h2>
+        <p className="text-xs text-slate-500 mt-1 font-medium">
+          Connectez-vous pour pointer ou gérer votre équipe
+        </p>
+      </div>
 
-        <div className="p-6 sm:p-8 space-y-6">
-          
-          {/* Quick Demo Test Buttons */}
-          <div className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                Accès Test Instantané
-              </span>
-              <button
-                type="button"
-                onClick={handleSeed}
-                disabled={seeding}
-                className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 underline transition-colors"
-              >
-                {seeding ? 'Création...' : 'Réinitialiser Démos'}
-              </button>
+      {/* Tabs */}
+      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 mb-6">
+        <button
+          type="button"
+          onClick={() => { setActiveTab('employee'); setError(null); }}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'employee'
+              ? 'bg-white text-emerald-700 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          📱 Espace Employé
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('admin'); setError(null); }}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'admin'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          👑 Direction / Admin
+        </button>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-800">
+          <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <span className="font-bold block mb-0.5">Attention</span>
+            {error}
+          </div>
+        </div>
+      )}
+
+      {/* EMPLOYEE FORM (Phone + Name) */}
+      {activeTab === 'employee' ? (
+        <form onSubmit={handleEmployeeSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Numéro de Téléphone
+            </label>
+            <div className="relative">
+              <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0550 12 34 56"
+                required
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono font-medium transition-all"
+              />
             </div>
+            <span className="text-[11px] text-slate-500 mt-1 block">
+              💡 Sert d'identifiant unique pour votre smartphone.
+            </span>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('yasser@pyjamadz.com', 'pyjamadz2026')}
-                className="flex flex-col items-start p-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-left transition-all group"
-              >
-                <span className="text-xs font-bold text-emerald-400 group-hover:translate-x-0.5 transition-transform">
-                  📱 Employé Test
-                </span>
-                <span className="text-[10px] text-slate-400 truncate w-full mt-0.5">
-                  yasser@pyjamadz.com
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@pyjamadz.com', 'pyjamadz2026')}
-                className="flex flex-col items-start p-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-left transition-all group"
-              >
-                <span className="text-xs font-bold text-indigo-400 group-hover:translate-x-0.5 transition-transform">
-                  👑 Admin Test
-                </span>
-                <span className="text-[10px] text-slate-400 truncate w-full mt-0.5">
-                  admin@pyjamadz.com
-                </span>
-              </button>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Nom et Prénom
+            </label>
+            <div className="relative">
+              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Ex : Yasser Latreche"
+                required
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white font-medium transition-all"
+              />
             </div>
           </div>
 
-          {/* Feedback Messages */}
-          {seedSuccess && (
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2 text-emerald-300 text-xs font-medium animate-fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>{seedSuccess}</span>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 text-red-300 text-xs font-medium animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Adresse Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nom@pyjamadz.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Mot de Passe
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                  <KeyRound className="w-4 h-4" />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
-                />
-              </div>
-            </div>
-
+          <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:from-emerald-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-xl text-sm transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Connexion en cours...</span>
+                </>
               ) : (
                 <>
-                  <span>Se Connecter</span>
+                  <span>Entrer / S'inscrire</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
-          </form>
+          </div>
 
-          {/* Security Notice */}
-          <div className="pt-2 border-t border-slate-800 text-center">
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              🔒 <strong className="text-slate-400">Anti-Fraude Actif :</strong> Lors de votre première connexion, votre smartphone sera lié de manière définitive à votre matricule.
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              <strong className="text-slate-800">Note sécurité :</strong> Lors de votre première inscription, votre compte sera en attente de validation par l'administrateur.
             </p>
           </div>
-        </div>
-      </div>
+        </form>
+      ) : (
+        /* ADMIN FORM (username321 / 765483cr654) */
+        <form onSubmit={handleAdminSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Nom d'utilisateur Admin
+            </label>
+            <div className="relative">
+              <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="username321"
+                required
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Mot de passe
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                required
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-extrabold rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Vérification...</span>
+                </>
+              ) : (
+                <>
+                  <span>Connexion Direction</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl text-center">
+            <p className="text-[11px] text-indigo-900">
+              ⚡ Accès réservé à la direction et aux auditeurs de paie Pyjama DZ.
+            </p>
+          </div>
+        </form>
+      )}
+
     </div>
   );
 }
