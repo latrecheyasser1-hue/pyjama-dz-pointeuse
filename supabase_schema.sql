@@ -109,56 +109,23 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance_logs ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
-    CREATE POLICY "Users read workplaces" ON workplaces FOR SELECT USING (true);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+    CREATE POLICY "Allow read workplaces" ON workplaces FOR SELECT USING (true);
+    CREATE POLICY "Allow manage workplaces" ON workplaces FOR ALL USING (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-    CREATE POLICY "Users read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+    CREATE POLICY "Allow read profiles" ON profiles FOR SELECT USING (true);
+    CREATE POLICY "Allow insert profiles" ON profiles FOR INSERT WITH CHECK (true);
+    CREATE POLICY "Allow update profiles" ON profiles FOR UPDATE USING (true);
+    CREATE POLICY "Allow delete profiles" ON profiles FOR DELETE USING (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-    CREATE POLICY "Users insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE POLICY "Users update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE POLICY "Admins manage all profiles" ON profiles FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE POLICY "Employees read own logs" ON attendance_logs FOR SELECT USING (auth.uid() = employee_id);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE POLICY "Employees insert own logs" ON attendance_logs FOR INSERT WITH CHECK (auth.uid() = employee_id);
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE POLICY "Admins manage all logs" ON attendance_logs FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+    CREATE POLICY "Allow read logs" ON attendance_logs FOR SELECT USING (true);
+    CREATE POLICY "Allow insert logs" ON attendance_logs FOR INSERT WITH CHECK (true);
+    CREATE POLICY "Allow update logs" ON attendance_logs FOR UPDATE USING (true);
+    CREATE POLICY "Allow delete logs" ON attendance_logs FOR DELETE USING (true);
+EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- 6. INITIAL WORKPLACE SEED
 INSERT INTO workplaces (name, qr_secret)
