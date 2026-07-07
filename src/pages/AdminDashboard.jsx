@@ -13,7 +13,17 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL' | 'pending' | 'active'
   const [activeTab, setActiveTab] = useState('employees'); // 'employees' | 'attendance'
 
-  // 1. Fetch all employees & today's logs
+  const getTodayString = () => new Date().toISOString().split('T')[0];
+  const getYesterdayString = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getTodayString());
+  const [dateMode, setDateMode] = useState('today'); // 'today' | 'yesterday' | 'custom'
+
+  // 1. Fetch all employees & logs for selectedDate
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -26,14 +36,15 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       if (pErr) throw pErr;
       setEmployees((profs || []).filter(p => p.role !== 'admin'));
 
-      // 1.2 Fetch today's logs
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      // 1.2 Fetch logs for selectedDate
+      const startOfDay = new Date(`${selectedDate}T00:00:00.000`);
+      const endOfDay = new Date(`${selectedDate}T23:59:59.999`);
 
       const { data: logs, error: lErr } = await supabase
         .from('attendance_logs')
         .select('*, profiles(full_name, phone, email, role)')
         .gte('server_timestamp', startOfDay.toISOString())
+        .lte('server_timestamp', endOfDay.toISOString())
         .order('server_timestamp', { ascending: false });
 
       if (lErr) throw lErr;
@@ -62,7 +73,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [selectedDate]);
 
   // Seed Demo Accounts Helper
   const handleSeed = async () => {
@@ -467,18 +478,50 @@ export default function AdminDashboard({ user, profile, onLogout }) {
         {/* LIVE ATTENDANCE LOGS FEED */}
         {activeTab === 'attendance' && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900">
-                Flux des Pointages en Temps Réel (Aujourd'hui)
+                Flux des Pointages ({selectedDate === getTodayString() ? "Aujourd'hui" : selectedDate === getYesterdayString() ? "Hier" : selectedDate})
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Horodatage centralisé côté serveur • Aucun risque de triche d'heure
               </p>
             </div>
-            <span className="text-xs font-bold font-mono px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span> Live Realtime
-            </span>
+
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <select
+                value={dateMode}
+                onChange={(e) => {
+                  const mode = e.target.value;
+                  setDateMode(mode);
+                  if (mode === 'today') setSelectedDate(getTodayString());
+                  else if (mode === 'yesterday') setSelectedDate(getYesterdayString());
+                }}
+                className="py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-extrabold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="today">📅 Aujourd'hui ({getTodayString()})</option>
+                <option value="yesterday">⏳ Hier ({getYesterdayString()})</option>
+                <option value="custom">🔍 Choisir une date...</option>
+              </select>
+
+              {dateMode === 'custom' && (
+                <input
+                  type="date"
+                  max={getTodayString()}
+                  value={selectedDate}
+                  onChange={(e) => {
+                    if (e.target.value <= getTodayString()) {
+                      setSelectedDate(e.target.value);
+                    }
+                  }}
+                  className="py-1.5 px-3 bg-white border-2 border-emerald-500 text-emerald-900 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm font-mono"
+                />
+              )}
+
+              <span className="text-xs font-bold font-mono px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1.5 ml-auto sm:ml-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span> Live
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -523,7 +566,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 {attendanceLogs.length === 0 && (
                   <tr>
                     <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">
-                      Aucun pointage enregistré aujourd'hui.
+                      Aucun pointage enregistré pour le {selectedDate}.
                     </td>
                   </tr>
                 )}
