@@ -11,6 +11,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [actionMessage, setActionMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // 'ALL' | 'pending' | 'active'
+  const [activeTab, setActiveTab] = useState('employees'); // 'employees' | 'attendance'
 
   // 1. Fetch all employees & today's logs
   const fetchData = async () => {
@@ -263,8 +264,46 @@ export default function AdminDashboard({ user, profile, onLogout }) {
           </div>
         )}
 
+        {/* Navigation Tabs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2 bg-slate-100/80 border border-slate-200/80 rounded-2xl shadow-inner">
+          <button
+            type="button"
+            onClick={() => setActiveTab('employees')}
+            className={`py-3.5 px-5 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 transition-all ${
+              activeTab === 'employees'
+                ? 'bg-white text-indigo-700 shadow-md border border-slate-200/60 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Users className={`w-5 h-5 shrink-0 ${activeTab === 'employees' ? 'text-indigo-600' : 'text-slate-500'}`} />
+            <span>👥 Gestion & Validation des Employés</span>
+            {pendingCount > 0 && (
+              <span className="ml-1 px-2 py-0.5 bg-amber-500 text-white rounded-full text-xs font-black animate-pulse">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('attendance')}
+            className={`py-3.5 px-5 rounded-xl text-sm font-black flex items-center justify-center gap-2.5 transition-all ${
+              activeTab === 'attendance'
+                ? 'bg-white text-emerald-700 shadow-md border border-slate-200/60 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Clock className={`w-5 h-5 shrink-0 ${activeTab === 'attendance' ? 'text-emerald-600' : 'text-slate-500'}`} />
+            <span>⏱️ Flux des Pointages en Temps Réel</span>
+            <span className="ml-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 font-mono rounded-full text-xs font-bold">
+              {attendanceLogs.length}
+            </span>
+          </button>
+        </div>
+
         {/* EMPLOYEE MANAGEMENT SECTION (WITH VALIDATION BUTTONS) */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+        {activeTab === 'employees' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-fade-in">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900">
@@ -423,9 +462,11 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </table>
           </div>
         </div>
+        )}
 
         {/* LIVE ATTENDANCE LOGS FEED */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+        {activeTab === 'attendance' && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6 animate-fade-in">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
               <h3 className="text-lg sm:text-xl font-black text-slate-900">
@@ -490,6 +531,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </table>
           </div>
         </div>
+        )}
 
       </main>
 
