@@ -23,7 +23,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
         .order('created_at', { ascending: false });
 
       if (pErr) throw pErr;
-      setEmployees(profs || []);
+      setEmployees((profs || []).filter(p => p.role !== 'admin'));
 
       // 1.2 Fetch today's logs
       const startOfDay = new Date();
