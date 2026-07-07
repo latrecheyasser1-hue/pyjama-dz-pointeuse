@@ -147,7 +147,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
       setScanResult({
         type: result.action === 'CHECK_IN' ? 'ENTRÉE' : 'SORTIE',
         message: result.message,
-        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        timestamp: new Date().toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit', second: '2-digit' })
       });
 
       // Refresh summary

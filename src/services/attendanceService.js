@@ -6,6 +6,24 @@ import { validateQRToken } from './qrService';
 import { verifyOrBindDevice } from './deviceService';
 
 /**
+ * Returns the ISO timestamp corresponding to 00:00:00.000 in Algeria/Chlef (Africa/Algiers, UTC+01:00) for the current date.
+ * This guarantees the day switches precisely at 00:00:00 Chlef time, regardless of browser or OS timezone!
+ */
+function getAlgiersTodayStartISO() {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Algiers',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}T00:00:00.000+01:00`;
+}
+
+/**
  * Processes a scanned QR token string for an employee
  */
 export async function processAttendanceScan(userId, scannedTokenString) {
@@ -36,15 +54,14 @@ export async function processAttendanceScan(userId, scannedTokenString) {
   }
 
   // 4. Determine Action Type (Check-In vs Check-Out)
-  // Fetch the employee's last scan today (UTC date)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // Fetch the employee's last scan today (in Chlef/Algeria time)
+  const todayStartISO = getAlgiersTodayStartISO();
 
   const { data: lastLogs, error: logErr } = await supabase
     .from('attendance_logs')
     .select('id, action_type, scan_time')
     .eq('employee_id', userId)
-    .gte('scan_time', todayStart.toISOString())
+    .gte('scan_time', todayStartISO)
     .order('scan_time', { ascending: false })
     .limit(1);
 
@@ -101,8 +118,8 @@ export async function processAttendanceScan(userId, scannedTokenString) {
     employeeName: profile.full_name,
     isNewBinding: deviceCheck.isNewBinding,
     message: nextAction === 'check_in' 
-      ? `Bonne journée de travail, ${profile.full_name} ! Entrée pointée à ${new Date(newLog.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' })}.`
-      : `Bon repos, ${profile.full_name} ! Sortie pointée à ${new Date(newLog.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' })}.`
+      ? `Bonne journée de travail, ${profile.full_name} ! Entrée pointée à ${new Date(newLog.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' })}.`
+      : `Bon repos, ${profile.full_name} ! Sortie pointée à ${new Date(newLog.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' })}.`
   };
 }
 
@@ -110,14 +127,13 @@ export async function processAttendanceScan(userId, scannedTokenString) {
  * Fetch employee today's attendance summary & logs
  */
 export async function getEmployeeTodayStatus(userId) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const todayStartISO = getAlgiersTodayStartISO();
 
   const { data: logs, error } = await supabase
     .from('attendance_logs')
     .select('id, action_type, scan_time, workplace_id, workplaces(name)')
     .eq('employee_id', userId)
-    .gte('scan_time', todayStart.toISOString())
+    .gte('scan_time', todayStartISO)
     .order('scan_time', { ascending: true });
 
   if (error) {
@@ -188,9 +204,9 @@ export async function getTodaySummary(userId) {
   
   if (statusObj.logs && statusObj.logs.length > 0) {
     const firstIn = statusObj.logs.find(l => l.action_type === 'check_in');
-    if (firstIn) checkInTime = new Date(firstIn.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' });
+    if (firstIn) checkInTime = new Date(firstIn.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' });
     const lastOut = [...statusObj.logs].reverse().find(l => l.action_type === 'check_out');
-    if (lastOut) checkOutTime = new Date(lastOut.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' });
+    if (lastOut) checkOutTime = new Date(lastOut.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' });
   }
 
   return {

@@ -15,11 +15,26 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [attendanceSubTab, setAttendanceSubTab] = useState('summary'); // 'summary' | 'logs'
   const [presenceFilter, setPresenceFilter] = useState('ALL'); // 'ALL' | 'present' | 'absent'
 
-  const getTodayString = () => new Date().toISOString().split('T')[0];
+  // Get YYYY-MM-DD specifically in Algeria/Chlef timezone (Africa/Algiers, UTC+1)
+  const getAlgiersDateString = (date = new Date()) => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Algiers',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+  };
+
+  const getTodayString = () => getAlgiersDateString(new Date());
   const getYesterdayString = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return getAlgiersDateString(d);
   };
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
@@ -38,15 +53,15 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       if (pErr) throw pErr;
       setEmployees((profs || []).filter(p => p.role !== 'admin'));
 
-      // 1.2 Fetch logs for selectedDate
-      const startOfDay = new Date(`${selectedDate}T00:00:00.000`);
-      const endOfDay = new Date(`${selectedDate}T23:59:59.999`);
+      // 1.2 Fetch logs for selectedDate in Algeria/Chlef timezone (UTC+01:00)
+      const startOfDay = `${selectedDate}T00:00:00.000+01:00`;
+      const endOfDay = `${selectedDate}T23:59:59.999+01:00`;
 
       const { data: logs, error: lErr } = await supabase
         .from('attendance_logs')
         .select('*, profiles(full_name, phone, email, role)')
-        .gte('server_timestamp', startOfDay.toISOString())
-        .lte('server_timestamp', endOfDay.toISOString())
+        .gte('server_timestamp', startOfDay)
+        .lte('server_timestamp', endOfDay)
         .order('server_timestamp', { ascending: false });
 
       if (lErr) throw lErr;
@@ -209,8 +224,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     return {
       ...emp,
       isPresent,
-      firstInTime: firstIn ? new Date(firstIn.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null,
-      lastOutTime: lastOut ? new Date(lastOut.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null,
+      firstInTime: firstIn ? new Date(firstIn.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
+      lastOutTime: lastOut ? new Date(lastOut.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
       scansCount: empLogs.length
     };
   });
@@ -706,7 +721,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   <th className="py-3 px-4">Employé</th>
                   <th className="py-3 px-4">Téléphone</th>
                   <th className="py-3 px-4">Action</th>
-                  <th className="py-3 px-4">Heure Serveur (UTC)</th>
+                  <th className="py-3 px-4">Heure (Chlef / Algérie)</th>
                   <th className="py-3 px-4">Statut Sécurité</th>
                 </tr>
               </thead>
@@ -729,7 +744,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
-                      {new Date(log.server_timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      {new Date(log.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
