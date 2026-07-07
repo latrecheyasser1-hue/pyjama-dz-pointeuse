@@ -214,7 +214,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
+            <div className="text-right">
               <span className="text-xs font-bold text-slate-800 block">
                 {profile?.full_name || 'Direction'}
               </span>
@@ -222,15 +222,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 👑 Administrateur
               </span>
             </div>
-
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-200 hover:border-red-200 text-xs font-bold"
-              title="Se déconnecter"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Quitter</span>
-            </button>
           </div>
         </div>
       </header>
