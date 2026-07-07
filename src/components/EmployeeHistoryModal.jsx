@@ -327,7 +327,7 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                   singleDate === todayStr ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                🟢 Aujourd'hui (Lyawm)
+                🟢 Aujourd'hui
               </button>
               <button
                 onClick={() => {
@@ -340,7 +340,7 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                   singleDate === getPastDateStr(1) ? 'bg-amber-500 text-white border-amber-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                🟡 Hier (Lamss)
+                🟡 Hier
               </button>
             </div>
           ) : (
@@ -555,7 +555,7 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
               <span className="text-xl">🔴</span>
               <div>
                 <div className="text-[10px] font-extrabold text-rose-300 uppercase tracking-wider">
-                  Total Ghiyaab (Absences)
+                  Total Absences
                 </div>
                 <div className="text-lg font-black font-mono text-white">
                   {totalAbsentDays} {totalAbsentDays > 1 ? 'jours' : 'jour'}
