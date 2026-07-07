@@ -25,6 +25,8 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
     return getAlgiersDateString(d);
   };
 
+  const [filterMode, setFilterMode] = useState('range'); // 'single' | 'range'
+  const [singleDate, setSingleDate] = useState(todayStr);
   const [startDate, setStartDate] = useState(getPastDateStr(6)); // 7 days inclusive
   const [endDate, setEndDate] = useState(todayStr);
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
 
   // Quick preset buttons
   const applyPreset = (days) => {
+    setFilterMode('range');
     setEndDate(todayStr);
     setStartDate(getPastDateStr(days - 1));
   };
@@ -265,49 +268,132 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
 
         {/* Date Filter Bar */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-extrabold text-slate-600 flex items-center gap-1.5">
-              📅 Période du :
-            </span>
-            <input
-              type="date"
-              value={startDate}
-              max={endDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <span className="text-xs font-extrabold text-slate-400">au</span>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate}
-              max={todayStr}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          
+          {/* Mode Switcher: Single Day vs Range */}
+          <div className="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl shadow-inner">
+            <button
+              onClick={() => {
+                setFilterMode('single');
+                setStartDate(singleDate);
+                setEndDate(singleDate);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                filterMode === 'single' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              📌 Jour unique
+            </button>
+            <button
+              onClick={() => {
+                setFilterMode('range');
+                setEndDate(todayStr);
+                setStartDate(getPastDateStr(6));
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                filterMode === 'range' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              🗓️ Période
+            </button>
           </div>
 
-          {/* Preset Buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => applyPreset(7)}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
-            >
-              7 Derniers Jours
-            </button>
-            <button
-              onClick={() => applyPreset(14)}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
-            >
-              14 Jours
-            </button>
-            <button
-              onClick={() => applyPreset(30)}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
-            >
-              30 Jours
-            </button>
-          </div>
+          {/* Controls based on mode */}
+          {filterMode === 'single' ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                📅 Choisir un jour :
+              </span>
+              <input
+                type="date"
+                value={singleDate}
+                max={todayStr}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  if (d <= todayStr) {
+                    setSingleDate(d);
+                    setStartDate(d);
+                    setEndDate(d);
+                  }
+                }}
+                className="bg-white border-2 border-indigo-500 text-indigo-950 rounded-xl px-3 py-1.5 text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={() => {
+                  setSingleDate(todayStr);
+                  setStartDate(todayStr);
+                  setEndDate(todayStr);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm border ${
+                  singleDate === todayStr ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                🟢 Aujourd'hui (Lyawm)
+              </button>
+              <button
+                onClick={() => {
+                  const yest = getPastDateStr(1);
+                  setSingleDate(yest);
+                  setStartDate(yest);
+                  setEndDate(yest);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm border ${
+                  singleDate === getPastDateStr(1) ? 'bg-amber-500 text-white border-amber-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                🟡 Hier (Lamss)
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-extrabold text-slate-600 flex items-center gap-1.5">
+                📅 Période du :
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                max={endDate}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  setStartDate(d);
+                  if (d > endDate) setEndDate(d);
+                }}
+                className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <span className="text-xs font-extrabold text-slate-400">au</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate}
+                max={todayStr}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  setEndDate(d);
+                  if (d < startDate) setStartDate(d);
+                }}
+                className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex items-center gap-1.5 ml-1">
+                <button
+                  onClick={() => applyPreset(7)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
+                >
+                  7 Jours
+                </button>
+                <button
+                  onClick={() => applyPreset(14)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
+                >
+                  14 Jours
+                </button>
+                <button
+                  onClick={() => applyPreset(30)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-sm"
+                >
+                  30 Jours
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content Body: Timeline Strip per Day */}
