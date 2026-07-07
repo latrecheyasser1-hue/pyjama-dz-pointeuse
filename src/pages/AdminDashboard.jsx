@@ -168,7 +168,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       l.id,
       l.profiles?.full_name || 'Inconnu',
       l.profiles?.phone || l.profiles?.email || '---',
-      l.action_type === 'CHECK_IN' ? 'ENTREE' : 'SORTIE',
+      (l.action_type || '').toLowerCase() === 'check_in' ? 'ENTREE' : 'SORTIE',
       l.server_timestamp,
       l.verification_status
     ]);
@@ -546,11 +546,11 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     </td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase ${
-                        log.action_type === 'CHECK_IN'
+                        (log.action_type || '').toLowerCase() === 'check_in'
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-indigo-100 text-indigo-800'
                       }`}>
-                        {log.action_type === 'CHECK_IN' ? '🟢 ENTRÉE' : '🛑 SORTIE'}
+                        {(log.action_type || '').toLowerCase() === 'check_in' ? '🟢 ENTRÉE' : '🛑 SORTIE'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
