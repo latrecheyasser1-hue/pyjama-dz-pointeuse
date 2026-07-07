@@ -114,3 +114,40 @@ export async function verifyOrBindDevice(userId) {
     `🚫 ALERTE SÉCURITÉ : Cet appareil n'est pas reconnu pour le compte de ${profile.full_name}. Vous ne pouvez pointer que depuis votre téléphone personnel enregistré. Si vous avez changé de téléphone, contactez l'administrateur.`
   );
 }
+
+/**
+ * Returns basic information about the current device/browser
+ */
+export function getDeviceInfo() {
+  const nav = window.navigator;
+  const storageId = localStorage.getItem('pyjama_device_uuid') || 'Non enregistré';
+  return {
+    fingerprint: storageId,
+    userAgent: nav.userAgent || 'Unknown Mobile',
+    platform: nav.platform || 'Mobile OS',
+    language: nav.language || 'fr-DZ',
+    screen: `${window.screen.width}x${window.screen.height}`
+  };
+}
+
+/**
+ * Verifies device lock (alias for verifyOrBindDevice)
+ */
+export async function verifyDeviceLock(userId, currentFingerprint) {
+  return await verifyOrBindDevice(userId);
+}
+
+/**
+ * Unlocks / resets a user's device binding so they can log in from a new phone
+ */
+export async function unlockUserDevice(userId) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ bound_device_id: null })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error("Erreur lors du déverrouillage de l'appareil : " + error.message);
+  }
+  return true;
+}

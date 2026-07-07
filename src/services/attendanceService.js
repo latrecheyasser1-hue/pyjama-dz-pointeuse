@@ -147,3 +147,57 @@ export async function getEmployeeTodayStatus(userId) {
     totalHoursToday: Math.round(totalHoursToday * 100) / 100
   };
 }
+
+/**
+ * Toggle attendance (manual check-in / check-out button or scanner trigger)
+ */
+export async function toggleAttendance(userId, workplaceId, fingerprint) {
+  const statusObj = await getEmployeeTodayStatus(userId);
+  const nextAction = statusObj.currentStatus === 'in' ? 'check_out' : 'check_in';
+  
+  const { data: newLog, error } = await supabase
+    .from('attendance_logs')
+    .insert([{
+      employee_id: userId,
+      workplace_id: workplaceId || null,
+      action_type: nextAction,
+      scan_time: new Date().toISOString(),
+      device_fingerprint: typeof fingerprint === 'string' ? fingerprint : 'device_mobile'
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error("Erreur de pointage : " + error.message);
+  }
+
+  return {
+    action: nextAction === 'check_in' ? 'CHECK_IN' : 'CHECK_OUT',
+    message: nextAction === 'check_in' ? "Pointage d'entrée enregistré avec succès !" : "Pointage de sortie enregistré avec succès !",
+    log: newLog
+  };
+}
+
+/**
+ * Returns today's summary formatted for EmployeeScanner
+ */
+export async function getTodaySummary(userId) {
+  const statusObj = await getEmployeeTodayStatus(userId);
+  let checkInTime = null;
+  let checkOutTime = null;
+  
+  if (statusObj.logs && statusObj.logs.length > 0) {
+    const firstIn = statusObj.logs.find(l => l.action_type === 'check_in');
+    if (firstIn) checkInTime = new Date(firstIn.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' });
+    const lastOut = [...statusObj.logs].reverse().find(l => l.action_type === 'check_out');
+    if (lastOut) checkOutTime = new Date(lastOut.scan_time).toLocaleTimeString('fr-DZ', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  return {
+    status: statusObj.currentStatus === 'in' ? 'IN' : 'OUT',
+    totalHours: statusObj.totalHoursToday || 0,
+    checkInTime: checkInTime || '--:--',
+    checkOutTime: checkOutTime || '--:--'
+  };
+}
+
