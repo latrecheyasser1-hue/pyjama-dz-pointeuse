@@ -87,7 +87,7 @@ export async function processAttendanceScan(userId, scannedTokenString) {
     }
   }
 
-  // 5. Insert Attendance Log (Server timestamp is handled by PostgreSQL default now())
+  // 5. Insert Attendance Log with explicit scan_time
   const { data: newLog, error: insertErr } = await supabase
     .from('attendance_logs')
     .insert([
@@ -95,6 +95,7 @@ export async function processAttendanceScan(userId, scannedTokenString) {
         employee_id: userId,
         workplace_id: workplace.id,
         action_type: nextAction,
+        scan_time: new Date().toISOString(),
         device_fingerprint: fingerprint,
         qr_token_used: scannedTokenString,
         notes: deviceCheck.isNewBinding ? 'Premier pointage - Appareil lié automatiquement' : 'Pointage vérifié via QR Code dynamique'

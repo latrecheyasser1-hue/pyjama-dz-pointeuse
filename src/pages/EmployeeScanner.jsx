@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { validateQRToken } from '../services/qrService';
 import { getDeviceFingerprint, getDeviceInfo, verifyDeviceLock } from '../services/deviceService';
-import { toggleAttendance, getTodaySummary } from '../services/attendanceService';
+import { toggleAttendance, getTodaySummary, processAttendanceScan } from '../services/attendanceService';
 import { Camera, CameraOff, CheckCircle2, AlertTriangle, Clock, RefreshCw, Smartphone, ShieldCheck, Play, Lock, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -113,41 +113,15 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
     setScanResult(null);
 
     try {
-      if (!profile || !profile.workplace_id) {
-        throw new Error('Votre profil n\'est assigné à aucun lieu de travail.');
-      }
-
-      // 4.1 Validate QR Token (30s window + grace buffer)
-      const { data: wp } = await supabase
-        .from('workplaces')
-        .select('qr_secret')
-        .eq('id', profile.workplace_id)
-        .single();
-
-      if (!wp) throw new Error('Lieu de travail introuvable.');
-
-      const validation = await validateQRToken(profile.workplace_id, wp.qr_secret, tokenString);
-      if (!validation.valid) {
-        throw new Error(validation.error);
-      }
-
-      // 4.2 Verify Device Lock
-      const currentFingerprint = getDeviceFingerprint();
-      const deviceCheck = await verifyDeviceLock(user.id, currentFingerprint);
-      if (!deviceCheck.allowed) {
-        throw new Error(deviceCheck.error);
-      }
-
-      // 4.3 Execute Check-in / Check-out
-      const result = await toggleAttendance(user.id, profile.workplace_id, currentFingerprint);
+      const result = await processAttendanceScan(user.id, tokenString);
 
       triggerSuccessFeedback();
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
 
       setScanResult({
-        type: result.action === 'CHECK_IN' ? 'ENTRÉE' : 'SORTIE',
+        type: (result.action === 'check_in' || result.action === 'CHECK_IN') ? 'ENTRÉE' : 'SORTIE',
         message: result.message,
-        timestamp: new Date().toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        timestamp: new Date(result.scanTime || new Date()).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit', second: '2-digit' })
       });
 
       // Refresh summary

@@ -71,6 +71,7 @@ export async function verifyOrBindDevice(userId) {
   if (profile.role === 'admin') {
     return {
       authorized: true,
+      allowed: true,
       profile,
       fingerprint: currentFingerprint,
       isNewBinding: false,
@@ -91,6 +92,7 @@ export async function verifyOrBindDevice(userId) {
 
     return {
       authorized: true,
+      allowed: true,
       profile: { ...profile, bound_device_id: currentFingerprint },
       fingerprint: currentFingerprint,
       isNewBinding: true,
@@ -102,6 +104,7 @@ export async function verifyOrBindDevice(userId) {
   if (profile.bound_device_id === currentFingerprint) {
     return {
       authorized: true,
+      allowed: true,
       profile,
       fingerprint: currentFingerprint,
       isNewBinding: false,
