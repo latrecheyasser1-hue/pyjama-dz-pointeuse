@@ -142,20 +142,33 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
     setScanResult(null);
 
     try {
-      if (!profile || !profile.workplace_id) {
-        throw new Error('Profil non assigné à un lieu de travail.');
+      let wpId = profile?.workplace_id;
+      let qrSecret = null;
+
+      if (wpId) {
+        const { data: wp } = await supabase
+          .from('workplaces')
+          .select('qr_secret')
+          .eq('id', wpId)
+          .single();
+        if (wp) qrSecret = wp.qr_secret;
       }
 
-      const { data: wp } = await supabase
-        .from('workplaces')
-        .select('qr_secret')
-        .eq('id', profile.workplace_id)
-        .single();
-
-      if (!wp) throw new Error('Lieu de travail introuvable.');
+      if (!wpId || !qrSecret) {
+        const { data: defaultWp } = await supabase
+          .from('workplaces')
+          .select('id, qr_secret')
+          .limit(1)
+          .single();
+        if (!defaultWp) throw new Error('Aucun lieu de travail configuré dans le système.');
+        wpId = defaultWp.id;
+        qrSecret = defaultWp.qr_secret;
+        if (profile) profile.workplace_id = wpId;
+        await supabase.from('profiles').update({ workplace_id: wpId }).eq('id', user.id);
+      }
 
       const { generateDynamicQR, getCurrentEpoch30s } = await import('../services/qrService');
-      const validToken = await generateDynamicQR(profile.workplace_id, wp.qr_secret, getCurrentEpoch30s());
+      const validToken = await generateDynamicQR(wpId, qrSecret, getCurrentEpoch30s());
 
       await handleQRScanned(validToken);
     } catch (e) {

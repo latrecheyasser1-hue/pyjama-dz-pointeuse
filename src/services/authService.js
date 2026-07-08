@@ -70,7 +70,7 @@ export async function loginAdminUsername(username, password) {
   // Ensure admin profile exists in profiles table and has admin role
   const { data: profile, error: profErr } = await supabase
     .from('profiles')
-    .select('id, full_name, role, status, workplace_id, bound_device_id, workplaces(name)')
+    .select('*, workplaces(name)')
     .eq('id', data.user.id)
     .single();
 
@@ -85,7 +85,7 @@ export async function loginAdminUsername(username, password) {
       status: 'active'
     };
     await supabase.from('profiles').upsert(newAdminProfile);
-    return { user: data.user, profile: newAdminProfile };
+    return { user: data.user, profile: await ensureWorkplaceAssigned(newAdminProfile, data.user.id) };
   }
 
   // Make sure role is admin
@@ -97,7 +97,7 @@ export async function loginAdminUsername(username, password) {
 
   return {
     user: data.user,
-    profile
+    profile: await ensureWorkplaceAssigned(profile, data.user.id)
   };
 }
 
@@ -220,19 +220,21 @@ export async function loginEmployeeByPhone(phone) {
   // Fetch existing profile
   const { data: existingProfile } = await supabase
     .from('profiles')
-    .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
+    .select('*, workplaces(name)')
     .eq('id', signInData.user.id)
     .single();
 
+  const finalProfile = await ensureWorkplaceAssigned(existingProfile || {
+    id: signInData.user.id,
+    full_name: 'Employé',
+    phone: cleanPhone,
+    role: 'employee',
+    status: 'pending'
+  }, signInData.user.id);
+
   return {
     user: signInData.user,
-    profile: existingProfile || {
-      id: signInData.user.id,
-      full_name: 'Employé',
-      phone: cleanPhone,
-      role: 'employee',
-      status: 'pending'
-    }
+    profile: finalProfile
   };
 }
 
@@ -282,6 +284,23 @@ export async function logoutUser() {
   localStorage.removeItem('pyjama_active_tab');
 }
 
+async function ensureWorkplaceAssigned(profile, userId) {
+  if (!profile) return profile;
+  if (!profile.workplace_id && profile.role !== 'admin') {
+    const { data: defaultWp } = await supabase
+      .from('workplaces')
+      .select('id, name')
+      .limit(1)
+      .single();
+    if (defaultWp) {
+      profile.workplace_id = defaultWp.id;
+      profile.workplaces = { name: defaultWp.name };
+      await supabase.from('profiles').update({ workplace_id: defaultWp.id }).eq('id', userId || profile.id);
+    }
+  }
+  return profile;
+}
+
 /**
  * Get Current Active Session & Profile
  */
@@ -291,19 +310,21 @@ export async function getCurrentSessionAndProfile() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, role, status, phone, workplace_id, bound_device_id, workplaces(name)')
+    .select('*, workplaces(name)')
     .eq('id', session.user.id)
     .single();
+
+  const finalProfile = await ensureWorkplaceAssigned(profile || {
+    id: session.user.id,
+    full_name: session.user.email.split('@')[0],
+    role: 'employee',
+    status: 'pending'
+  }, session.user.id);
 
   return {
     session,
     user: session.user,
-    profile: profile || {
-      id: session.user.id,
-      full_name: session.user.email.split('@')[0],
-      role: 'employee',
-      status: 'pending'
-    }
+    profile: finalProfile
   };
 }
 
