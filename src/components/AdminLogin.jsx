@@ -3,8 +3,8 @@ import { loginAdminUsername } from '../services/authService';
 import { Key, Lock, ArrowRight, Loader2, ShieldAlert, Building2 } from 'lucide-react';
 
 export default function AdminLogin({ onSuccess }) {
-  const [username, setUsername] = useState('username321');
-  const [password, setPassword] = useState('765483cr654');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -63,7 +63,7 @@ export default function AdminLogin({ onSuccess }) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="username321"
+                placeholder="Identifiant admin"
                 required
                 className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 font-mono font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
               />
