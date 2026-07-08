@@ -105,6 +105,19 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
   };
 
   const processDays = (fetchedLogs) => {
+    const todayStr = getAlgiersDateString(new Date());
+
+    // Determine the validation date (start of official tracking)
+    let validationDateStr = null;
+    if (employee?.validated_at) {
+      validationDateStr = getAlgiersDateString(new Date(employee.validated_at));
+    } else if (employee?.created_at) {
+      validationDateStr = getAlgiersDateString(new Date(employee.created_at));
+    } else if (fetchedLogs.length > 0) {
+      const earliest = fetchedLogs.reduce((min, l) => l.scan_time < min ? l.scan_time : min, fetchedLogs[0].scan_time);
+      validationDateStr = getAlgiersDateString(new Date(earliest));
+    }
+
     // 1. Build list of all dates between startDate and endDate
     const dateList = [];
     let curr = new Date(`${startDate}T12:00:00Z`);
@@ -128,8 +141,34 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
         return getAlgiersDateString(new Date(log.scan_time)) === dateStr;
       });
 
-      // If 0 scans -> Absent Day!
+      // If 0 scans -> Check why before counting as Absent!
       if (dayLogs.length === 0) {
+        // 1. If date is in the future relative to today, do not mark as absent
+        if (dateStr > todayStr) {
+          return {
+            dateStr,
+            isAbsent: false,
+            isFuture: true,
+            workMins: 0,
+            pauseMins: 0,
+            segments: [],
+            logs: []
+          };
+        }
+
+        // 2. If this date is BEFORE the employee was validated (`dateStr < validationDateStr`), OR account is pending
+        if ((validationDateStr && dateStr < validationDateStr) || employee?.status === 'pending') {
+          return {
+            dateStr,
+            isAbsent: false,
+            isBeforeValidation: true,
+            workMins: 0,
+            pauseMins: 0,
+            segments: [],
+            logs: []
+          };
+        }
+
         sumAbsent += 1;
         return {
           dateStr,
@@ -439,7 +478,15 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {day.isAbsent ? (
+                    {day.isBeforeValidation ? (
+                      <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-black tracking-wide border border-slate-300 flex items-center gap-1.5 shadow-sm">
+                        ⏳ Avant validation du compte
+                      </span>
+                    ) : day.isFuture ? (
+                      <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold tracking-wide border border-slate-200 flex items-center gap-1.5 shadow-sm">
+                        📅 Date à venir
+                      </span>
+                    ) : day.isAbsent ? (
                       <span className="px-3 py-1 rounded-xl bg-rose-100 text-rose-800 text-xs font-black tracking-wide border border-rose-200 flex items-center gap-1.5 shadow-sm">
                         🔴 ABSENT(E) (Aucun pointage)
                       </span>
@@ -461,7 +508,17 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                 {/* 24h Timeline Bar (Chriit Zamani) */}
                 <div className="space-y-1.5 my-4">
                   <div className="relative h-9 w-full bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner flex">
-                    {day.isAbsent ? (
+                    {day.isBeforeValidation ? (
+                      /* Grey Bar for Pre-Validation Day */
+                      <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-[10px] sm:text-xs tracking-normal sm:tracking-wide px-2 text-center truncate shadow-inner">
+                        ⏳ NON COMPTABILISÉ — COMPTE NON ENCORE VALIDÉ À CETTE DATE
+                      </div>
+                    ) : day.isFuture ? (
+                      /* Light Grey Bar for Future Day */
+                      <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 font-medium text-[10px] sm:text-xs tracking-normal px-2 text-center truncate">
+                        📅 JOURNÉE À VENIR
+                      </div>
+                    ) : day.isAbsent ? (
                       /* Solid Red Bar for Absent Day */
                       <div className="w-full h-full bg-gradient-to-r from-rose-500 to-rose-600 flex items-center justify-center text-white font-black text-[10px] sm:text-xs tracking-normal sm:tracking-widest px-2 text-center truncate shadow-sm">
                         🔴 JOURNÉE D'ABSENCE - AUCUN POINTAGE ENREGISTRÉ

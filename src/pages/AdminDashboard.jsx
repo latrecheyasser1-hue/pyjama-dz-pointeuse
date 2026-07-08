@@ -108,14 +108,24 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   // 2. Validate / Approve Pending Employee
   const handleValidateEmployee = async (empId, empName) => {
     try {
-      const { error } = await supabase
+      const nowIso = new Date().toISOString();
+      let { error } = await supabase
         .from('profiles')
-        .update({ status: 'active' })
+        .update({ status: 'active', validated_at: nowIso })
         .eq('id', empId);
+
+      // If validated_at column does not exist yet in profiles table, fallback to updating status only
+      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('validated_at'))) {
+        const fallback = await supabase
+          .from('profiles')
+          .update({ status: 'active' })
+          .eq('id', empId);
+        error = fallback.error;
+      }
 
       if (error) throw error;
 
-      setActionMessage({ type: 'success', text: `✅ L'employé "${empName}" a été validé et peut maintenant pointer !` });
+      setActionMessage({ type: 'success', text: `✅ L'employé "${empName}" a été validé et son calendrier débute aujourd'hui !` });
       fetchData();
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
