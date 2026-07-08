@@ -3,13 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" id="app-manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Pointeuse DZ" />
+    <meta name="apple-mobile-web-app-title" id="apple-app-title" content="Pointeuse DZ" />
     <title>Pyjama DZ Pointeuse — Système de Pointage PWA</title>
+    <script>
+      (function() {
+        try {
+          var path = window.location.pathname.toLowerCase();
+          var manifestUrl = '/manifest.json';
+          var title = 'Pyjama DZ';
+          if (path.indexOf('/employees') !== -1 || path.indexOf('/scanner') !== -1) {
+            manifestUrl = '/manifest-employees.json';
+            title = 'Espace Employé';
+            localStorage.setItem('pyjama_last_portal', '/employees');
+          } else if (path.indexOf('/admin') !== -1) {
+            manifestUrl = '/manifest-admin.json';
+            title = 'Espace Direction';
+            localStorage.setItem('pyjama_last_portal', '/admin');
+          } else if (path.indexOf('/qr') !== -1) {
+            manifestUrl = '/manifest-qr.json';
+            title = 'Écran Mural QR';
+            localStorage.setItem('pyjama_last_portal', '/QR');
+          }
+          var mLink = document.getElementById('app-manifest');
+          if (mLink) mLink.href = manifestUrl;
+          var aMeta = document.getElementById('apple-app-title');
+          if (aMeta) aMeta.content = title;
+          if (title !== 'Pyjama DZ') document.title = title + ' — Pyjama DZ';
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body class="bg-white text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
     <div id="root"></div>

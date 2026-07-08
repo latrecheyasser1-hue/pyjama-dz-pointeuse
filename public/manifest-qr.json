@@ -1,0 +1,19 @@
+{
+  "short_name": "Écran Mural QR",
+  "name": "Pyjama DZ — Écran Mural QR",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/QR",
+  "scope": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Écran mural de pointage par QR Code — Pyjama DZ."
+}

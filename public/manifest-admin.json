@@ -1,0 +1,19 @@
+{
+  "short_name": "Espace Direction",
+  "name": "Pyjama DZ — Espace Direction",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/admin",
+  "scope": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#334155",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Portail Direction & Supervision — Pyjama DZ."
+}

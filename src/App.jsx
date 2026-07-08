@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { getCurrentSessionAndProfile } from './services/authService';
 import WallQRDisplay from './pages/WallQRDisplay';
 import EmployeeScanner from './pages/EmployeeScanner';
@@ -11,14 +11,47 @@ import './App.css';
 /**
  * Pyjama DZ Pointeuse — 100% Standalone & Isolated Routes
  * Chaque URL est un portail totalement autonome :
- * - / (Root / PWA Start URL) : Redirige automatiquement l'utilisateur connecté vers son espace, ou affiche un menu d'accueil tactile
+ * - / (Root / PWA Start URL) : Redirige automatiquement vers l'espace mémorisé (/employees, /admin ou /QR)
  * - /QR (ou /qr) : Écran Mural Code QR pur
  * - /employees (ou /scanner) : Portail Employé & Pointage
  * - /admin : Portail Direction & Supervision
  */
 
+// Surveillance dynamique de l'URL pour changer le manifest PWA (Add to Home Screen cible l'URL exacte)
+function RouteWatcher() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname.toLowerCase();
+    let manifestUrl = '/manifest.json';
+    let title = 'Pyjama DZ';
+
+    if (path.includes('/employees') || path.includes('/scanner')) {
+      manifestUrl = '/manifest-employees.json';
+      title = 'Espace Employé';
+      localStorage.setItem('pyjama_last_portal', '/employees');
+    } else if (path.includes('/admin')) {
+      manifestUrl = '/manifest-admin.json';
+      title = 'Espace Direction';
+      localStorage.setItem('pyjama_last_portal', '/admin');
+    } else if (path.includes('/qr')) {
+      manifestUrl = '/manifest-qr.json';
+      title = 'Écran Mural QR';
+      localStorage.setItem('pyjama_last_portal', '/QR');
+    }
+
+    const mLink = document.getElementById('app-manifest');
+    if (mLink) mLink.href = manifestUrl;
+    const aMeta = document.getElementById('apple-app-title');
+    if (aMeta) aMeta.content = title;
+    if (title !== 'Pyjama DZ') document.title = `${title} — Pyjama DZ`;
+  }, [location]);
+
+  return null;
+}
+
 function RootRoute({ user, profile }) {
-  // If already logged in, redirect straight to their respective portal when PWA launches!
+  // 1. If already logged in, redirect straight to their respective portal when PWA launches!
   if (user && profile) {
     if (profile.role === 'admin') {
       return <Navigate to="/admin" replace />;
@@ -28,7 +61,13 @@ function RootRoute({ user, profile }) {
     }
   }
 
-  // If not logged in, show a modern, touch-friendly portal selection screen for mobile home screen launches
+  // 2. Even if not logged in right now, if this device previously visited or added from a specific space, launch directly into it!
+  const lastPortal = localStorage.getItem('pyjama_last_portal');
+  if (lastPortal && (lastPortal === '/employees' || lastPortal === '/admin' || lastPortal === '/QR')) {
+    return <Navigate to={lastPortal} replace />;
+  }
+
+  // 3. Only if completely new device with zero memory, show the one-time selection screen
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 sm:p-6 text-white font-sans selection:bg-emerald-500 selection:text-white">
       <div className="w-full max-w-md bg-slate-800/90 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-md">
@@ -49,6 +88,7 @@ function RootRoute({ user, profile }) {
           {/* 1. Espace Employé */}
           <Link
             to="/employees"
+            onClick={() => localStorage.setItem('pyjama_last_portal', '/employees')}
             className="w-full flex items-center gap-4 bg-emerald-600 hover:bg-emerald-500 active:scale-98 transition-all p-4 rounded-2xl font-bold text-left shadow-lg shadow-emerald-600/20 border border-emerald-500/50 group"
           >
             <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
@@ -64,6 +104,7 @@ function RootRoute({ user, profile }) {
           {/* 2. Espace Direction / Admin */}
           <Link
             to="/admin"
+            onClick={() => localStorage.setItem('pyjama_last_portal', '/admin')}
             className="w-full flex items-center gap-4 bg-slate-700/80 hover:bg-slate-700 active:scale-98 transition-all p-4 rounded-2xl font-bold text-left border border-slate-600 group"
           >
             <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
@@ -79,6 +120,7 @@ function RootRoute({ user, profile }) {
           {/* 3. Écran Mural Code QR */}
           <Link
             to="/QR"
+            onClick={() => localStorage.setItem('pyjama_last_portal', '/QR')}
             className="w-full flex items-center gap-4 bg-slate-800/60 hover:bg-slate-700/60 active:scale-98 transition-all p-3.5 rounded-2xl font-bold text-left border border-slate-700/80 text-slate-300 hover:text-white group"
           >
             <div className="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
@@ -150,6 +192,7 @@ export default function App() {
 
   return (
     <Router>
+      <RouteWatcher />
       <Routes>
         {/* 1. ROOT PATH (PWA SMART LAUNCHER OR REDIRECTOR) */}
         <Route path="/" element={<RootRoute user={user} profile={profile} />} />
