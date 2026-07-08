@@ -62,9 +62,9 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       const { data: logs, error: lErr } = await supabase
         .from('attendance_logs')
         .select('*, profiles(full_name, phone, email, role)')
-        .gte('server_timestamp', startOfDay)
-        .lte('server_timestamp', endOfDay)
-        .order('server_timestamp', { ascending: false });
+        .gte('scan_time', startOfDay)
+        .lte('scan_time', endOfDay)
+        .order('scan_time', { ascending: false });
 
       if (lErr) throw lErr;
       setAttendanceLogs(logs || []);
@@ -188,7 +188,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       l.profiles?.full_name || 'Inconnu',
       l.profiles?.phone || l.profiles?.email || '---',
       (l.action_type || '').toLowerCase() === 'check_in' ? 'ENTREE' : 'SORTIE',
-      l.server_timestamp,
+      l.scan_time,
       l.verification_status
     ]);
 
@@ -222,7 +222,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     const scansCount = empLogs.length;
     const isPresent = scansCount > 0;
     
-    // In attendanceLogs, logs are ordered by server_timestamp descending (newest first).
+    // In attendanceLogs, logs are ordered by scan_time descending (newest first).
     // So empLogs[0] is the LATEST (most recent) scan!
     const latestLog = empLogs[0];
     const latestAction = latestLog ? (latestLog.action_type || '').toLowerCase() : null;
@@ -247,8 +247,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       ...emp,
       isPresent,
       currentStatus,
-      firstInTime: firstIn ? new Date(firstIn.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
-      lastOutTime: lastOut ? new Date(lastOut.server_timestamp).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
+      firstInTime: firstIn ? new Date(firstIn.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
+      lastOutTime: lastOut ? new Date(lastOut.scan_time).toLocaleTimeString('fr-DZ', { timeZone: 'Africa/Algiers', hour: '2-digit', minute: '2-digit' }) : null,
       scansCount
     };
   });
@@ -910,9 +910,9 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 <div key={log.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-extrabold text-sm ${
-                      log.action === 'CHECK_IN' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      (log.action_type || '').toLowerCase() === 'check_in' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
                     }`}>
-                      {log.action === 'CHECK_IN' ? 'IN' : 'OUT'}
+                      {(log.action_type || '').toLowerCase() === 'check_in' ? 'IN' : 'OUT'}
                     </div>
                     <div>
                       <div className="font-bold text-slate-900 text-sm">{log.profiles?.full_name || 'Inconnu'}</div>
@@ -921,7 +921,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="font-mono font-extrabold text-xs text-slate-800">
-                      {new Date(log.server_timestamp).toLocaleTimeString('fr-FR', {
+                      {new Date(log.scan_time).toLocaleTimeString('fr-FR', {
                         timeZone: 'Africa/Algiers',
                         hour: '2-digit',
                         minute: '2-digit',
@@ -961,15 +961,15 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     </td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase border inline-flex items-center gap-1 ${
-                        log.action === 'CHECK_IN'
+                        (log.action_type || '').toLowerCase() === 'check_in'
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                           : 'bg-amber-100 text-amber-800 border-amber-300'
                       }`}>
-                        {log.action === 'CHECK_IN' ? '🟢 ENTRÉE' : '🟡 SORTIE / PAUSE'}
+                        {(log.action_type || '').toLowerCase() === 'check_in' ? '🟢 ENTRÉE' : '🟡 SORTIE / PAUSE'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
-                      {new Date(log.server_timestamp).toLocaleTimeString('fr-FR', {
+                      {new Date(log.scan_time).toLocaleTimeString('fr-FR', {
                         timeZone: 'Africa/Algiers',
                         hour: '2-digit',
                         minute: '2-digit',

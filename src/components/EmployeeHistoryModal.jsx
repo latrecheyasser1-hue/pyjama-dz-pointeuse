@@ -60,9 +60,9 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
         .from('attendance_logs')
         .select('*')
         .eq('employee_id', employee.id)
-        .gte('server_timestamp', startTimestamp)
-        .lte('server_timestamp', endTimestamp)
-        .order('server_timestamp', { ascending: true });
+        .gte('scan_time', startTimestamp)
+        .lte('scan_time', endTimestamp)
+        .order('scan_time', { ascending: true });
 
       if (error) throw error;
       setLogs(data || []);
@@ -125,7 +125,7 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
     const processed = dateList.map((dateStr) => {
       // Find logs for this day in Africa/Algiers
       const dayLogs = fetchedLogs.filter((log) => {
-        return getAlgiersDateString(new Date(log.server_timestamp)) === dateStr;
+        return getAlgiersDateString(new Date(log.scan_time)) === dateStr;
       });
 
       // If 0 scans -> Absent Day!
@@ -150,13 +150,13 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
         const currentLog = dayLogs[i];
         const nextLog = dayLogs[i + 1]; // could be undefined
 
-        const startMin = getMinuteOfDay(currentLog.server_timestamp);
+        const startMin = getMinuteOfDay(currentLog.scan_time);
 
-        if (currentLog.action === 'CHECK_IN') {
+        if ((currentLog.action_type || '').toLowerCase() === 'check_in') {
           // Work period starts at CHECK_IN
           let endMin;
           if (nextLog) {
-            endMin = getMinuteOfDay(nextLog.server_timestamp);
+            endMin = getMinuteOfDay(nextLog.scan_time);
           } else {
             // No next log! If today, work continues until current time. If past day, assume up to 8 hours or end of day
             if (dateStr === todayStr) {
@@ -176,10 +176,10 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
             duration,
             label: `Travail (${formatTimeFromMinute(startMin)} - ${formatTimeFromMinute(endMin)})`
           });
-        } else if (currentLog.action === 'CHECK_OUT') {
+        } else if ((currentLog.action_type || '').toLowerCase() === 'check_out') {
           // Pause period only exists if there IS a subsequent CHECK_IN on the same day!
-          if (nextLog && nextLog.action === 'CHECK_IN') {
-            const endMin = getMinuteOfDay(nextLog.server_timestamp);
+          if (nextLog && (nextLog.action_type || '').toLowerCase() === 'check_in') {
+            const endMin = getMinuteOfDay(nextLog.scan_time);
             const duration = Math.max(0, endMin - startMin);
             pauseMins += duration;
             segments.push({
@@ -507,13 +507,13 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                       <div
                         key={log.id || index}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1.5 shadow-2xs ${
-                          log.action === 'CHECK_IN'
+                          (log.action_type || '').toLowerCase() === 'check_in'
                             ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                             : 'bg-amber-50 text-amber-800 border-amber-200'
                         }`}
                       >
-                        <span>{log.action === 'CHECK_IN' ? '🟢 Entrée' : '🟡 Sortie'}</span>
-                        <span className="font-mono font-black">{formatTimeChlef(log.server_timestamp)}</span>
+                        <span>{(log.action_type || '').toLowerCase() === 'check_in' ? '🟢 Entrée' : '🟡 Sortie'}</span>
+                        <span className="font-mono font-black">{formatTimeChlef(log.scan_time)}</span>
                       </div>
                     ))}
                   </div>
