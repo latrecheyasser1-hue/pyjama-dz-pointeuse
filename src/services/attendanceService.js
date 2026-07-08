@@ -32,15 +32,34 @@ export async function processAttendanceScan(userId, scannedTokenString) {
   const profile = deviceCheck.profile;
   const fingerprint = deviceCheck.fingerprint;
 
-  if (!profile.workplace_id) {
-    throw new Error('Erreur : Votre compte n\'est assigné à aucun lieu de travail (Workplace). Contactez l\'administrateur.');
+  let workplaceId = profile.workplace_id;
+
+  // If workplace_id is null/missing on profile, auto-assign the active workplace
+  if (!workplaceId) {
+    const { data: defaultWps } = await supabase
+      .from('workplaces')
+      .select('id')
+      .limit(1);
+    const defaultWp = defaultWps && defaultWps.length > 0 ? defaultWps[0] : null;
+
+    if (defaultWp) {
+      workplaceId = defaultWp.id;
+      // Auto heal in database
+      await supabase
+        .from('profiles')
+        .update({ workplace_id: workplaceId })
+        .eq('id', userId);
+      profile.workplace_id = workplaceId;
+    } else {
+      throw new Error('Erreur : Aucun lieu de travail (Workplace) n\'est configuré dans la base de données.');
+    }
   }
 
   // 2. Fetch Workplace details & Secret
   const { data: workplace, error: wpErr } = await supabase
     .from('workplaces')
     .select('id, name, qr_secret')
-    .eq('id', profile.workplace_id)
+    .eq('id', workplaceId)
     .single();
 
   if (wpErr || !workplace) {

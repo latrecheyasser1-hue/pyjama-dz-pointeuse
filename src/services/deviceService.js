@@ -48,10 +48,10 @@ export async function getDeviceFingerprint() {
 export async function verifyOrBindDevice(userId) {
   const currentFingerprint = await getDeviceFingerprint();
 
-  // Fetch user profile
+  // Fetch user profile with all fields including workplace_id
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, full_name, role, status, bound_device_id')
+    .select('*, workplaces(name)')
     .eq('id', userId)
     .single();
 

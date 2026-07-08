@@ -39,6 +39,25 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
     init();
   }, [user]);
 
+  // Force PWA cache refresh helper
+  const forceHardRefresh = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        for (let name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+  };
+
   // 2. Audio & Haptic Feedback Helper
   const triggerSuccessFeedback = () => {
     if ('vibrate' in navigator) {
@@ -198,6 +217,14 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={forceHardRefresh}
+              title="Forcer la mise à jour et vider le cache PWA"
+              className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-all border border-emerald-200 active:scale-95 flex items-center gap-1.5 text-xs font-black shadow-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>v2.6 (Actualiser)</span>
+            </button>
             <div className="text-right">
               <span className="text-xs font-bold text-slate-800 block">
                 {profile?.full_name || 'Employé'}
@@ -335,12 +362,21 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
 
               {/* Error Feedback Banner */}
               {error && (
-                <div className="w-full max-w-sm mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-800 shadow-sm">
-                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <span className="font-bold block mb-0.5">Échec de vérification</span>
-                    {error}
+                <div className="w-full max-w-sm mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex flex-col gap-3 text-red-800 shadow-sm animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold block mb-0.5">Échec de vérification</span>
+                      {error}
+                    </div>
                   </div>
+                  <button
+                    onClick={forceHardRefresh}
+                    className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>🔄 Vider le cache PWA & Réparer (v2.6)</span>
+                  </button>
                 </div>
               )}
 

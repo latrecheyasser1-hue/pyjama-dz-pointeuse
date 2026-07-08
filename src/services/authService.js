@@ -286,12 +286,12 @@ export async function logoutUser() {
 
 async function ensureWorkplaceAssigned(profile, userId) {
   if (!profile) return profile;
-  if (!profile.workplace_id && profile.role !== 'admin') {
-    const { data: defaultWp } = await supabase
+  if (!profile.workplace_id) {
+    const { data: defaultWps } = await supabase
       .from('workplaces')
       .select('id, name')
-      .limit(1)
-      .single();
+      .limit(1);
+    const defaultWp = defaultWps && defaultWps.length > 0 ? defaultWps[0] : null;
     if (defaultWp) {
       profile.workplace_id = defaultWp.id;
       profile.workplaces = { name: defaultWp.name };
