@@ -516,48 +516,48 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
         </div>
 
         {/* Footer: Global Totals */}
-        <div className="p-6 bg-slate-900 text-white border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="p-4 sm:p-6 bg-slate-900 text-white border-t border-slate-800 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
               📊 Bilan Global de la période sélectionnée :
             </span>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
             {/* Total Work Hours */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl">
-              <span className="text-xl">🟢</span>
+            <div className="flex items-center gap-3 p-3.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl">
+              <span className="text-2xl shrink-0">🟢</span>
               <div>
                 <div className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
                   Total Heures de Travail
                 </div>
-                <div className="text-lg font-black font-mono text-white">
+                <div className="text-base sm:text-lg font-black font-mono text-white">
                   {formatDuration(totalWorkMins)}
                 </div>
               </div>
             </div>
 
             {/* Total Pause Hours */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-400/30 rounded-2xl">
-              <span className="text-xl">🟡</span>
+            <div className="flex items-center gap-3 p-3.5 bg-amber-500/20 border border-amber-400/30 rounded-2xl">
+              <span className="text-2xl shrink-0">🟡</span>
               <div>
                 <div className="text-[10px] font-extrabold text-amber-300 uppercase tracking-wider">
                   Total Heures de Pause
                 </div>
-                <div className="text-lg font-black font-mono text-white">
+                <div className="text-base sm:text-lg font-black font-mono text-white">
                   {formatDuration(totalPauseMins)}
                 </div>
               </div>
             </div>
 
             {/* Total Absent Days */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-rose-500/20 border border-rose-400/30 rounded-2xl">
-              <span className="text-xl">🔴</span>
+            <div className="flex items-center gap-3 p-3.5 bg-rose-500/20 border border-rose-400/30 rounded-2xl">
+              <span className="text-2xl shrink-0">🔴</span>
               <div>
                 <div className="text-[10px] font-extrabold text-rose-300 uppercase tracking-wider">
                   Total Absences
                 </div>
-                <div className="text-lg font-black font-mono text-white">
+                <div className="text-base sm:text-lg font-black font-mono text-white">
                   {totalAbsentDays} {totalAbsentDays > 1 ? 'jours' : 'jour'}
                 </div>
               </div>

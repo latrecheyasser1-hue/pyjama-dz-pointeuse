@@ -219,6 +219,15 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
                 {profile?.phone || 'Connecté'}
               </span>
             </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title="Se déconnecter"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-all border border-slate-200 active:scale-95"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -264,32 +273,32 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
           /* ACTIVE EMPLOYEE SCANNER VIEW */
           <>
             {/* Top Employee Profile & Live Status Card */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white text-xl font-black shadow-md">
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white text-xl font-black shadow-md shrink-0">
                   {profile?.full_name?.charAt(0) || 'E'}
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900">
                     {profile?.full_name || 'Employé Pyjama DZ'}
                   </h2>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-1 text-xs text-slate-500">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="font-mono font-bold text-slate-700">Tél : {profile?.phone || '---'}</span>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <span className="text-slate-500">Appareil lié & sécurisé</span>
                   </div>
                 </div>
               </div>
 
               {/* Live Attendance Badge */}
-              <div className="flex flex-col items-end">
-                <div className={`px-4 py-2 rounded-2xl font-extrabold text-xs flex items-center gap-2 shadow-sm ${
+              <div className="flex flex-col items-center sm:items-end w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                <div className={`px-4 py-2 rounded-2xl font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto ${
                   summary.status === 'IN' 
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' 
                     : 'bg-slate-100 text-slate-700 border border-slate-300'
                 }`}>
-                  <span className={`w-2.5 h-2.5 rounded-full ${summary.status === 'IN' ? 'bg-emerald-600 animate-ping' : 'bg-slate-400'}`}></span>
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${summary.status === 'IN' ? 'bg-emerald-600 animate-ping' : 'bg-slate-400'}`}></span>
                   <span>{summary.status === 'IN' ? '🟢 EN POSTE' : '🔴 HORS POSTE'}</span>
                 </div>
                 {summary.checkInTime && (
@@ -301,7 +310,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
             </div>
 
             {/* Main Camera / Action Area */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-8 shadow-xl flex flex-col items-center justify-center relative overflow-hidden">
               
               {/* Camera Viewport */}
               <div className="w-full max-w-sm aspect-square bg-slate-900 rounded-2xl overflow-hidden border-2 border-slate-200 relative shadow-inner flex items-center justify-center mb-6">
@@ -354,17 +363,17 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
                   <button
                     onClick={startScanner}
                     disabled={loadingAction}
-                    className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-sm transition-all shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2"
+                    className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-sm sm:text-base transition-all shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 active:scale-95"
                   >
-                    <Camera className="w-5 h-5" />
+                    <Camera className="w-5 h-5 shrink-0" />
                     <span>📷 Ouvrir Caméra Scanner</span>
                   </button>
                 ) : (
                   <button
                     onClick={stopScanner}
-                    className="w-full py-4 px-6 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-sm transition-all shadow-lg shadow-red-600/25 flex items-center justify-center gap-2"
+                    className="w-full py-4 px-6 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-sm sm:text-base transition-all shadow-lg shadow-red-600/25 flex items-center justify-center gap-2 active:scale-95"
                   >
-                    <CameraOff className="w-5 h-5" />
+                    <CameraOff className="w-5 h-5 shrink-0" />
                     <span>🛑 Fermer Caméra</span>
                   </button>
                 )}
