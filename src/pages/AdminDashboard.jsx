@@ -4,6 +4,7 @@ import { unlockUserDevice } from '../services/deviceService';
 import { seedDemoAccounts } from '../services/authService';
 import { Users, Clock, Smartphone, Unlock, Download, RefreshCw, Check, Building2, UserCheck, Search, LogOut, Sparkles, Trash2, Ban } from 'lucide-react';
 import EmployeeHistoryModal from '../components/EmployeeHistoryModal';
+import OfflineWorkerEnrollment from '../components/OfflineWorkerEnrollment';
 
 export default function AdminDashboard({ user, profile, onLogout }) {
   const [employees, setEmployees] = useState([]);
@@ -413,11 +414,17 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 Exigence : Les employés s'inscrivent par téléphone et doivent être validés par l'admin ici pour pouvoir scanner.
               </p>
             </div>
+          </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
+          <OfflineWorkerEnrollment 
+            workplaceId={profile.workplace_id} 
+            onEmployeeAdded={fetchData} 
+          />
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full justify-end mb-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -436,8 +443,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 <option value="active">✅ Actifs ({employees.filter(e => e.status === 'active').length})</option>
               </select>
             </div>
-          </div>
-
           {/* Mobile Card View (hidden on desktop: block md:hidden) */}
           <div className="block md:hidden space-y-4">
             {filteredEmployees.map((emp) => (

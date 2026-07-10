@@ -1,7 +1,8 @@
 // ============================================================================
 // Pyjama DZ Pointeuse: Authentication & Demo Helper Service
 // ============================================================================
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Admin Login with Custom Username & Password
@@ -382,5 +383,87 @@ export async function seedDemoAccounts() {
   return {
     employee: { email: 'yasser@pyjamadz.com', pass: 'pyjamadz2026', status: 'OK' },
     admin: { email: 'admin@pyjamadz.com', pass: 'pyjamadz2026', status: 'OK' }
+  };
+}
+
+/**
+ * Create an offline employee (Face Recognition) without affecting Admin's active session
+ */
+export async function createOfflineEmployee(fullName, phone) {
+  const cleanPhone = normalizePhone(phone);
+  if (!cleanPhone || cleanPhone.length < 8) {
+    throw new Error('Veuillez entrer un numéro de téléphone valide.');
+  }
+  if (!fullName || fullName.trim().length < 2) {
+    throw new Error('Veuillez entrer le nom complet.');
+  }
+
+  const syntheticEmail = `${cleanPhone}@pyjamadz.employee`;
+  const syntheticPassword = `phone_auth_${cleanPhone}_dz_secure_2026`;
+
+  // 1. Check if phone already exists
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone')
+    .eq('phone', cleanPhone)
+    .maybeSingle();
+
+  if (existingProfile) {
+    throw new Error(`❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit au nom de "${existingProfile.full_name}" !`);
+  }
+
+  // 2. Create a Temp Client (No session persistence)
+  const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+
+  // 3. Register user using tempClient
+  const { data: signUpData, error: signUpErr } = await tempClient.auth.signUp({
+    email: syntheticEmail,
+    password: syntheticPassword,
+    options: {
+      data: { full_name: fullName.trim(), phone: cleanPhone }
+    }
+  });
+
+  if (signUpErr) {
+    throw new Error(`Erreur d'inscription : ${signUpErr.message}`);
+  }
+
+  if (!signUpData?.user) {
+    throw new Error('Impossible de créer le compte employé hors-ligne.');
+  }
+
+  // 4. Fetch default workplace
+  const { data: wp } = await supabase
+    .from('workplaces')
+    .select('id')
+    .limit(1)
+    .single();
+  const workplaceId = wp ? wp.id : null;
+
+  // 5. Insert profile with Active status directly!
+  const newProfileData = {
+    id: signUpData.user.id,
+    workplace_id: workplaceId,
+    full_name: fullName.trim(),
+    email: syntheticEmail,
+    phone: cleanPhone,
+    role: 'employee',
+    status: 'active'
+  };
+
+  // We can use the main `supabase` client because the Admin has permission to insert/update profiles
+  const { error: insertErr } = await supabase.from('profiles').upsert(newProfileData);
+  if (insertErr) {
+      throw new Error(`Erreur de profil: ${insertErr.message}`);
+  }
+
+  return {
+    user: signUpData.user,
+    profile: newProfileData
   };
 }

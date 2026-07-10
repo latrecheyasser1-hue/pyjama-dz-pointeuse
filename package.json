@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
     "@tailwindcss/vite": "^4.3.2",
+    "@vladmandic/face-api": "^1.7.15",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "html5-qrcode": "^2.3.8",
