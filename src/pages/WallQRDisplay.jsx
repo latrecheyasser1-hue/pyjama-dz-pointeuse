@@ -93,8 +93,8 @@ export default function WallQRDisplay() {
       }
       streamRef.current = stream;
       
-      // Start continuous scanning
-      scanIntervalRef.current = setInterval(processVideoFrame, 1500);
+      // Start continuous scanning (plus rapide: 500ms au lieu de 1500ms)
+      scanIntervalRef.current = setInterval(processVideoFrame, 500);
     } catch (e) {
       console.error(e);
       setStatusMessage('Erreur Caméra. Vérifiez les permissions.');

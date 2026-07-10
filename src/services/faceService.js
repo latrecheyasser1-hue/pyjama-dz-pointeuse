@@ -59,19 +59,27 @@ export async function getFaceDescriptor(videoElement) {
 export function findMatchingProfile(scannedDescriptor, profiles) {
   if (!scannedDescriptor || !profiles || profiles.length === 0) return null;
   
-  const validProfiles = profiles.filter(p => p.face_descriptor && Array.isArray(p.face_descriptor));
+  const validProfiles = profiles.filter(p => {
+    if (!p.face_descriptor) return false;
+    let desc = p.face_descriptor;
+    if (typeof desc === 'string') {
+      try { desc = JSON.parse(desc); } catch (e) { return false; }
+      p.face_descriptor = desc;
+    }
+    return Array.isArray(desc);
+  });
+
   if (validProfiles.length === 0) return null;
   
   // Convertir les profils en LabeledFaceDescriptors pour face-api
   const labeledDescriptors = validProfiles.map(p => {
-    // On doit reconvertir l'array normal en Float32Array
     const float32Desc = new Float32Array(p.face_descriptor);
     return new faceapi.LabeledFaceDescriptors(p.id, [float32Desc]);
   });
   
   // Seuil de tolérance (distance max). Plus c'est bas, plus c'est strict.
-  // 0.6 est le standard par défaut. 0.5 est plus sécurisé.
-  const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
+  // 0.6 est le standard de face-api.js
+  const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
   
   const match = faceMatcher.findBestMatch(new Float32Array(scannedDescriptor));
   
