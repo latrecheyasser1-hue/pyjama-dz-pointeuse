@@ -26,11 +26,11 @@ export default function WallQRDisplay() {
   const [errorMsg, setErrorMsg] = useState('');
   useEffect(() => {
     async function fetchWorkplace() {
-      const { data, error } = await supabase.from('workplaces').select('id, qr_secret').limit(1).single();
-      if (data) {
-        setWorkplace(data);
+      const { data, error } = await supabase.rpc('get_qr_workplace');
+      if (data && data.length > 0) {
+        setWorkplace(data[0]);
       } else {
-        setErrorMsg("⚠️ Accès Refusé. Vous devez d'abord vous connecter au tableau de bord (Admin) sur cet appareil pour afficher le QR Code.");
+        setErrorMsg("⚠️ Erreur de configuration. Veuillez exécuter le code SQL fourni par l'assistant.");
       }
     }
     fetchWorkplace();
@@ -136,10 +136,11 @@ export default function WallQRDisplay() {
     stopCamera();
     setStatusMessage('✅ Enregistrement en cours...');
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({ face_descriptor: descriptor })
-      .eq('id', targetEmployee.employee_id);
+    // Utilisation d'une fonction RPC pour bypasser RLS (car la tablette n'est pas connectée)
+    const { error } = await supabase.rpc('update_face_descriptor', {
+      p_employee_id: targetEmployee.employee_id,
+      p_descriptor: descriptor
+    });
       
     if (!error) {
       setStatusMessage(`✅ Visage enregistré pour ${targetEmployee.employee_name} !`);
@@ -152,13 +153,10 @@ export default function WallQRDisplay() {
   };
 
   const handleCheckIn = async (descriptor) => {
-    // 1. Fetch all profiles with face descriptors
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, face_descriptor')
-      .not('face_descriptor', 'is', null);
+    // 1. Fetch all profiles with face descriptors using RPC to bypass RLS
+    const { data: profiles, error: pError } = await supabase.rpc('get_facial_profiles');
       
-    if (!profiles || profiles.length === 0) {
+    if (pError || !profiles || profiles.length === 0) {
       setStatusMessage('❌ Aucun visage enregistré dans le système.');
       setTimeout(() => closeCamera(), 3000);
       return;
@@ -187,21 +185,12 @@ export default function WallQRDisplay() {
     const d = parts.find(p => p.type === 'day').value;
     const dateStr = `${y}-${m}-${d}`;
     
-    // Determine Check In or Out
-    const { data: todayLogs } = await supabase
-      .from('attendance_logs')
-      .select('id')
-      .eq('employee_id', match.id)
-      .eq('date', dateStr);
-      
-    const actionType = (todayLogs && todayLogs.length > 0 && todayLogs.length % 2 !== 0) ? 'check_out' : 'check_in';
-    
-    const { error } = await supabase.from('attendance_logs').insert({
-      employee_id: match.id,
-      workplace_id: workplace.id,
-      date: dateStr,
-      action_type: actionType,
-      notes: 'Pointage par Reconnaissance Faciale'
+    // Use RPC to automatically determine check_in/check_out and insert bypassing RLS
+    const { data: actionType, error } = await supabase.rpc('process_facial_attendance', {
+      p_employee_id: match.id,
+      p_workplace_id: workplace.id,
+      p_date: dateStr,
+      p_notes: 'Pointage par Reconnaissance Faciale'
     });
     
     if (error) {
