@@ -652,83 +652,14 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   className="w-full sm:w-auto py-1.5 px-3 bg-white border-2 border-emerald-500 text-emerald-900 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm font-mono"
                 />
               )}
-
-              <span className="text-xs font-bold font-mono px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center justify-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span> Live
-              </span>
             </div>
           </div>
 
-          {/* KPI summary */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-full lg:w-auto">
-              <div className="py-2 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-sm w-full">
-                📊 Bilan & Absences
-              </div>
-            </div>
 
-            {/* KPI counters */}
-            <div className="grid grid-cols-2 sm:flex items-center gap-2 text-xs font-extrabold w-full lg:w-auto">
-              <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-700">
-                👥 Actifs : <span className="font-mono text-slate-900">{activeEmployees.length}</span>
-              </div>
-              <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm text-emerald-800">
-                🟢 En poste : <span className="font-mono text-emerald-700">{inCount}</span>
-              </div>
-              <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl shadow-sm text-amber-800">
-                🟡 Pause/Out : <span className="font-mono text-amber-700">{outCount}</span>
-              </div>
-              <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl shadow-sm text-rose-800">
-                🔴 Absents : <span className="font-mono text-rose-700">{absentCount}</span>
-              </div>
-            </div>
-          </div>
 
           {/* SUMMARY & ABSENCES */}
           <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center gap-2 border-b border-slate-200 pb-3 flex-wrap">
-                <span className="text-xs font-extrabold text-slate-500 mr-2">Filtrer par statut :</span>
-                <button
-                  onClick={() => setPresenceFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    presenceFilter === 'ALL'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Tout ({dailySummary.length})
-                </button>
-                <button
-                  onClick={() => setPresenceFilter('in')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    presenceFilter === 'in' || presenceFilter === 'present'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  }`}
-                >
-                  🟢 En poste ({inCount})
-                </button>
-                <button
-                  onClick={() => setPresenceFilter('out')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    presenceFilter === 'out'
-                      ? 'bg-amber-600 text-white shadow-sm'
-                      : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                  }`}
-                >
-                  🟡 Sortis / Pause ({outCount})
-                </button>
-                <button
-                  onClick={() => setPresenceFilter('absent')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    presenceFilter === 'absent'
-                      ? 'bg-rose-600 text-white shadow-sm'
-                      : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-                  }`}
-                >
-                  🔴 Absents ({absentCount})
-                </button>
-              </div>
+
 
               {/* Mobile Card View for Summary (hidden on desktop: block md:hidden) */}
               <div className="block md:hidden space-y-3">
