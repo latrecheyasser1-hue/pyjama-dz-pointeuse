@@ -38,6 +38,9 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
   const [totalPauseMins, setTotalPauseMins] = useState(0);
   const [totalAbsentDays, setTotalAbsentDays] = useState(0);
 
+  // Toggle for Bilan Global
+  const [isBilanOpen, setIsBilanOpen] = useState(false);
+
   // Quick preset buttons
   const applyPreset = (days) => {
     setFilterMode('range');
@@ -604,53 +607,61 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
         </div>
 
         {/* Footer: Global Totals */}
-        <div className="p-4 sm:p-6 bg-slate-900 text-white border-t border-slate-800 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
-              📊 Bilan Global de la période sélectionnée :
+        <div className="bg-slate-900 text-white border-t border-slate-800">
+          <button 
+            onClick={() => setIsBilanOpen(!isBilanOpen)}
+            className="w-full p-4 sm:p-6 flex items-center justify-between hover:bg-slate-800/50 transition-colors focus:outline-none"
+          >
+            <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              📊 Bilan Global de la période sélectionnée
             </span>
-          </div>
+            <span className="text-slate-400">
+              {isBilanOpen ? '▼' : '▲'}
+            </span>
+          </button>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
-            {/* Total Work Hours */}
-            <div className="flex items-center gap-3 p-3.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl">
-              <span className="text-2xl shrink-0">🟢</span>
-              <div>
-                <div className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
-                  Total Heures de Travail
+          {isBilanOpen && (
+            <div className="px-4 pb-4 sm:px-6 sm:pb-6 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full animate-fade-in">
+              {/* Total Work Hours */}
+              <div className="flex items-center gap-3 p-3.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl">
+                <span className="text-2xl shrink-0">🟢</span>
+                <div>
+                  <div className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
+                    Total Heures de Travail
+                  </div>
+                  <div className="text-base sm:text-lg font-black font-mono text-white">
+                    {formatDuration(totalWorkMins)}
+                  </div>
                 </div>
-                <div className="text-base sm:text-lg font-black font-mono text-white">
-                  {formatDuration(totalWorkMins)}
+              </div>
+
+              {/* Total Pause Hours */}
+              <div className="flex items-center gap-3 p-3.5 bg-amber-500/20 border border-amber-400/30 rounded-2xl">
+                <span className="text-2xl shrink-0">🟡</span>
+                <div>
+                  <div className="text-[10px] font-extrabold text-amber-300 uppercase tracking-wider">
+                    Total Heures de Pause
+                  </div>
+                  <div className="text-base sm:text-lg font-black font-mono text-white">
+                    {formatDuration(totalPauseMins)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Absent Days */}
+              <div className="flex items-center gap-3 p-3.5 bg-rose-500/20 border border-rose-400/30 rounded-2xl">
+                <span className="text-2xl shrink-0">🔴</span>
+                <div>
+                  <div className="text-[10px] font-extrabold text-rose-300 uppercase tracking-wider">
+                    Total Absences
+                  </div>
+                  <div className="text-base sm:text-lg font-black font-mono text-white">
+                    {totalAbsentDays} {totalAbsentDays > 1 ? 'jours' : 'jour'}
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Total Pause Hours */}
-            <div className="flex items-center gap-3 p-3.5 bg-amber-500/20 border border-amber-400/30 rounded-2xl">
-              <span className="text-2xl shrink-0">🟡</span>
-              <div>
-                <div className="text-[10px] font-extrabold text-amber-300 uppercase tracking-wider">
-                  Total Heures de Pause
-                </div>
-                <div className="text-base sm:text-lg font-black font-mono text-white">
-                  {formatDuration(totalPauseMins)}
-                </div>
-              </div>
-            </div>
-
-            {/* Total Absent Days */}
-            <div className="flex items-center gap-3 p-3.5 bg-rose-500/20 border border-rose-400/30 rounded-2xl">
-              <span className="text-2xl shrink-0">🔴</span>
-              <div>
-                <div className="text-[10px] font-extrabold text-rose-300 uppercase tracking-wider">
-                  Total Absences
-                </div>
-                <div className="text-base sm:text-lg font-black font-mono text-white">
-                  {totalAbsentDays} {totalAbsentDays > 1 ? 'jours' : 'jour'}
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
       </div>
