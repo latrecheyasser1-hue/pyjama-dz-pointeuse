@@ -333,27 +333,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
         
-        {/* Top Title Bar */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Supervision Générale & Paie
-            </h2>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              Validez les nouveaux inscrits, réinitialisez les téléphones et auditez les pointages en temps réel.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={fetchData}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all flex items-center gap-2 border border-slate-300"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Actualiser</span>
-            </button>
-          </div>
-        </div>
 
         {/* Action Banner Notification */}
         {actionMessage && (
