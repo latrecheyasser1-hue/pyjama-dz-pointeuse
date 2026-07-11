@@ -659,29 +659,12 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </div>
           </div>
 
-          {/* Sub-tabs and KPI summary */}
+          {/* KPI summary */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-2 sm:flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-full lg:w-auto">
-              <button
-                onClick={() => setAttendanceSubTab('summary')}
-                className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-                  attendanceSubTab === 'summary'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
+            <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-full lg:w-auto">
+              <div className="py-2 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 bg-emerald-600 text-white shadow-sm w-full">
                 📊 Bilan & Absences
-              </button>
-              <button
-                onClick={() => setAttendanceSubTab('logs')}
-                className={`py-2 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-                  attendanceSubTab === 'logs'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                📜 Historique ({attendanceLogs.length})
-              </button>
+              </div>
             </div>
 
             {/* KPI counters */}
@@ -701,9 +684,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
             </div>
           </div>
 
-          {/* TAB 1: SUMMARY & ABSENCES */}
-          {attendanceSubTab === 'summary' && (
-            <div className="space-y-4 animate-fade-in">
+          {/* SUMMARY & ABSENCES */}
+          <div className="space-y-4 animate-fade-in">
               <div className="flex items-center gap-2 border-b border-slate-200 pb-3 flex-wrap">
                 <span className="text-xs font-extrabold text-slate-500 mr-2">Filtrer par statut :</span>
                 <button
@@ -898,114 +880,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 </table>
               </div>
             </div>
-          )}
-
-          {/* TAB 2: RAW ATTENDANCE LOGS */}
-          {attendanceSubTab === 'logs' && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <span>📜 Flux brut des pointages ({attendanceLogs.length})</span>
-                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">
-                  Heure Chlef / Algérie
-                </span>
-              </h3>
-            </div>
-
-            {/* Mobile Card View for Logs (hidden on desktop: block md:hidden) */}
-            <div className="block md:hidden space-y-3 p-4">
-              {attendanceLogs.map((log) => (
-                <div key={log.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-extrabold text-sm ${
-                      (log.action_type || '').toLowerCase() === 'check_in' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}>
-                      {(log.action_type || '').toLowerCase() === 'check_in' ? 'IN' : 'OUT'}
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm">{log.profiles?.full_name || 'Inconnu'}</div>
-                      <div className="text-xs text-slate-500 font-medium">{log.notes || 'Pointage normal'}</div>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono font-extrabold text-xs text-slate-800">
-                      {new Date(log.scan_time).toLocaleTimeString('fr-FR', {
-                        timeZone: 'Africa/Algiers',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                      })}
-                    </div>
-                    <div className="text-[9px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-1 inline-block">
-                      ✔ Validé
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {attendanceLogs.length === 0 && (
-                <div className="py-8 text-center text-slate-400 font-medium bg-slate-50 rounded-2xl">
-                  Aucun pointage enregistré pour le {selectedDate}.
-                </div>
-              )}
-            </div>
-
-            {/* Desktop Table for Logs (hidden on mobile: hidden md:block) */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] font-black uppercase text-slate-500 tracking-wider bg-slate-50/50">
-                  <th className="py-3 px-4">Employé</th>
-                  <th className="py-3 px-4">Action</th>
-                  <th className="py-3 px-4">Heure (Chlef)</th>
-                  <th className="py-3 px-4">Message</th>
-                  <th className="py-3 px-4">Sécurité</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                {attendanceLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {log.profiles?.full_name || 'Inconnu'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase border inline-flex items-center gap-1 ${
-                        (log.action_type || '').toLowerCase() === 'check_in'
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : 'bg-amber-100 text-amber-800 border-amber-300'
-                      }`}>
-                        {(log.action_type || '').toLowerCase() === 'check_in' ? '🟢 ENTRÉE' : '🟡 SORTIE / PAUSE'}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
-                      {new Date(log.scan_time).toLocaleTimeString('fr-FR', {
-                        timeZone: 'Africa/Algiers',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                      })}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600">
-                      {log.notes || 'Pointage normal'}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
-                        ✔ Validé TOTP (30s)
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {attendanceLogs.length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">
-                      Aucun pointage enregistré pour le {selectedDate}.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        )}
       </div>
       )}
 
