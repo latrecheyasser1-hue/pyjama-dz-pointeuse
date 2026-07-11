@@ -109,24 +109,19 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   // 2. Validate / Approve Pending Employee
   const handleValidateEmployee = async (empId, empName) => {
     try {
-      const nowIso = new Date().toISOString();
-      let { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .update({ status: 'active', validated_at: nowIso })
-        .eq('id', empId);
-
-      // If validated_at column does not exist yet in profiles table, fallback to updating status only
-      if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('validated_at'))) {
-        const fallback = await supabase
-          .from('profiles')
-          .update({ status: 'active' })
-          .eq('id', empId);
-        error = fallback.error;
-      }
+        .update({ status: 'active' })
+        .eq('id', empId)
+        .select();
 
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error("Impossible de mettre à jour. Vous n'avez peut-être pas les permissions.");
+      }
 
-      setActionMessage({ type: 'success', text: `✅ L'employé "${empName}" a été validé et son calendrier débute aujourd'hui !` });
+      setActionMessage({ type: 'success', text: `✅ L'employé "${empName}" a été validé !` });
       fetchData();
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
@@ -472,7 +467,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
                 <div className="flex items-center justify-end gap-2 flex-wrap pt-1">
                   {emp.status === 'pending' && (
-                    <button onClick={() => handleValidateEmployee(emp.id, emp.full_name)} className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }} className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
                       <Check className="w-4 h-4" />
                       <span>Valider</span>
                     </button>
@@ -568,7 +563,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         {/* VALIDATE / APPROVE BUTTON FOR PENDING EMPLOYEES */}
                         {emp.status === 'pending' && (
                           <button
-                            onClick={() => handleValidateEmployee(emp.id, emp.full_name)}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }}
                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
                             title="Autoriser cet employé à scanner"
                           >
