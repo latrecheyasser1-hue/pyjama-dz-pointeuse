@@ -235,15 +235,22 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     
     // Current status:
     // 'absent' if 0 scans
+    // 'weekend' if 0 scans AND it's a Friday
     // 'in' if latestAction === 'check_in' (or odd scans)
     // 'out' if latestAction === 'check_out' (or even scans > 0)
     let currentStatus = 'absent';
+    
+    // Check if selected date is a Friday (day 5 in UTC)
+    const dayOfWeek = new Date(selectedDate).getUTCDay();
+
     if (scansCount > 0) {
       if (latestAction === 'check_in') {
         currentStatus = 'in';
       } else {
         currentStatus = 'out';
       }
+    } else if (dayOfWeek === 5) {
+      currentStatus = 'weekend';
     }
 
     const firstIn = [...empLogs].reverse().find(l => (l.action_type || '').toLowerCase() === 'check_in');
@@ -771,6 +778,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
                       emp.currentStatus === 'absent' ? 'bg-rose-50/70 border-rose-200' :
                       emp.currentStatus === 'out' ? 'bg-amber-50/50 border-amber-200' :
+                      emp.currentStatus === 'weekend' ? 'bg-sky-50/50 border-sky-200' :
                       'bg-slate-50 border-slate-200'
                     }`}
                   >
@@ -779,6 +787,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         <div className={`w-3 h-3 rounded-full shrink-0 ${
                           emp.currentStatus === 'in' ? 'bg-emerald-500 animate-pulse' :
                           emp.currentStatus === 'out' ? 'bg-amber-500' :
+                          emp.currentStatus === 'weekend' ? 'bg-sky-500' :
                           'bg-rose-500'
                         }`}></div>
                         <div>
@@ -794,6 +803,10 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         ) : emp.currentStatus === 'out' ? (
                           <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300 block text-center">
                             🟡 SORTI(E)
+                          </span>
+                        ) : emp.currentStatus === 'weekend' ? (
+                          <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300 block text-center">
+                            🌴 REPOS
                           </span>
                         ) : (
                           <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300 block text-center">
@@ -842,7 +855,8 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         title="👉 Cliquez pour voir l'historique et la chronologie 24h détaillée"
                         className={`hover:bg-indigo-50/60 cursor-pointer transition-all ${
                           emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
-                          emp.currentStatus === 'out' ? 'bg-amber-50/30' : ''
+                          emp.currentStatus === 'out' ? 'bg-amber-50/30' :
+                          emp.currentStatus === 'weekend' ? 'bg-sky-50/40' : ''
                         }`}
                       >
                         <td className="py-3.5 px-4 font-bold text-slate-900">
@@ -850,6 +864,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                             <div className={`w-2 h-2 rounded-full ${
                               emp.currentStatus === 'in' ? 'bg-emerald-500' :
                               emp.currentStatus === 'out' ? 'bg-amber-500' :
+                              emp.currentStatus === 'weekend' ? 'bg-sky-500' :
                               'bg-rose-500 animate-pulse'
                             }`}></div>
                             <span className="group-hover:text-indigo-600 underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</span>
@@ -865,7 +880,11 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                             </span>
                           ) : emp.currentStatus === 'out' ? (
                             <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300">
-                              🟡 SORTI(E) / PAUSE
+                              🟡 SORTI(E)
+                            </span>
+                          ) : emp.currentStatus === 'weekend' ? (
+                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300">
+                              🌴 REPOS
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300">

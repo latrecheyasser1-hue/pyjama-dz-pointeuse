@@ -169,6 +169,20 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
           };
         }
 
+        // 3. If this date is a FRIDAY (day 5), do not mark as absent
+        const dayOfWeek = new Date(dateStr).getUTCDay();
+        if (dayOfWeek === 5) {
+          return {
+            dateStr,
+            isAbsent: false,
+            isWeekend: true,
+            workMins: 0,
+            pauseMins: 0,
+            segments: [],
+            logs: []
+          };
+        }
+
         sumAbsent += 1;
         return {
           dateStr,
@@ -486,6 +500,10 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                       <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold tracking-wide border border-slate-200 flex items-center gap-1.5 shadow-sm">
                         📅 Date à venir
                       </span>
+                    ) : day.isWeekend ? (
+                      <span className="px-3 py-1 rounded-xl bg-sky-50 text-sky-700 text-xs font-black tracking-wide border border-sky-200 flex items-center gap-1.5 shadow-sm">
+                        🌴 VENDREDI (Repos)
+                      </span>
                     ) : day.isAbsent ? (
                       <span className="px-3 py-1 rounded-xl bg-rose-100 text-rose-800 text-xs font-black tracking-wide border border-rose-200 flex items-center gap-1.5 shadow-sm">
                         🔴 ABSENT(E) (Aucun pointage)
@@ -517,6 +535,11 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                       /* Light Grey Bar for Future Day */
                       <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 font-medium text-[10px] sm:text-xs tracking-normal px-2 text-center truncate">
                         📅 JOURNÉE À VENIR
+                      </div>
+                    ) : day.isWeekend ? (
+                      /* Sky Blue Bar for Weekend */
+                      <div className="w-full h-full bg-gradient-to-r from-sky-400 to-sky-500 flex items-center justify-center text-white font-black text-[10px] sm:text-xs tracking-normal sm:tracking-widest px-2 text-center truncate shadow-sm">
+                        🌴 VENDREDI - REPOS
                       </div>
                     ) : day.isAbsent ? (
                       /* Solid Red Bar for Absent Day */
