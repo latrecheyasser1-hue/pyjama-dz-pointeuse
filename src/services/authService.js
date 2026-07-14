@@ -139,35 +139,41 @@ export async function registerEmployeeByPhone(phone, fullName) {
     throw new Error(`❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit au nom de "${existingProfile.full_name}" ! Un numéro ne peut pas être utilisé deux fois.`);
   }
 
-  // 2. STRICT CHECK: Check if auth account already exists by trying to sign in
+  // 2. Check if auth account already exists by trying to sign in
   const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
     email: syntheticEmail,
     password: syntheticPassword
   });
 
+  let userId;
   if (!signInErr && signInData?.user) {
-    await supabase.auth.signOut();
-    throw new Error(`❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit ! Si vous avez déjà un compte, basculez vers l'onglet "Connexion".`);
-  }
+    // The auth account exists, but there's no profile (it was deleted by admin).
+    // We can just reuse this auth account for the new registration!
+    userId = signInData.user.id;
+  } else {
+    // 3. Register new employee
+    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      email: syntheticEmail,
+      password: syntheticPassword,
+      options: {
+        data: { full_name: fullName.trim(), phone: cleanPhone }
+      }
+    });
 
-  // 3. Register new employee
-  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-    email: syntheticEmail,
-    password: syntheticPassword,
-    options: {
-      data: { full_name: fullName.trim(), phone: cleanPhone }
+    if (signUpErr) {
+      throw new Error(signUpErr.message === 'User already registered'
+        ? `❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit dans le système !`
+        : `Erreur d'inscription : ${signUpErr.message}`);
     }
-  });
 
-  if (signUpErr) {
-    throw new Error(signUpErr.message === 'User already registered'
-      ? `❌ Ce numéro de téléphone (${cleanPhone}) est déjà inscrit dans le système !`
-      : `Erreur d'inscription : ${signUpErr.message}`);
+    if (!signUpData?.user) {
+      throw new Error('Impossible de créer le compte employé.');
+    }
+    
+    userId = signUpData.user.id;
   }
 
-  if (!signUpData?.user) {
-    throw new Error('Impossible de créer le compte employé.');
-  }
+
 
   // Fetch default workplace ID
   const { data: wp } = await supabase
@@ -179,7 +185,7 @@ export async function registerEmployeeByPhone(phone, fullName) {
 
   // Create new profile with status = 'pending'
   const newProfileData = {
-    id: signUpData.user.id,
+    id: userId,
     workplace_id: workplaceId,
     full_name: fullName.trim(),
     email: syntheticEmail,
@@ -190,8 +196,11 @@ export async function registerEmployeeByPhone(phone, fullName) {
 
   await supabase.from('profiles').upsert(newProfileData);
 
+  // Return the user (if we reused the auth, we need to return the user object)
+  const userObj = signInData?.user || signUpData?.user || { id: userId, email: syntheticEmail };
+
   return {
-    user: signUpData.user,
+    user: userObj,
     profile: newProfileData
   };
 }
@@ -223,15 +232,14 @@ export async function loginEmployeeByPhone(phone) {
     .from('profiles')
     .select('*, workplaces(name)')
     .eq('id', signInData.user.id)
-    .single();
+    .maybeSingle(); // maybeSingle so it doesn't throw if 0 rows
 
-  const finalProfile = await ensureWorkplaceAssigned(existingProfile || {
-    id: signInData.user.id,
-    full_name: 'Employé',
-    phone: cleanPhone,
-    role: 'employee',
-    status: 'pending'
-  }, signInData.user.id);
+  if (!existingProfile) {
+    await supabase.auth.signOut();
+    throw new Error(`❌ Ce numéro n'est plus actif ou a été supprimé. Veuillez vous réinscrire dans l'onglet "Inscription".`);
+  }
+
+  const finalProfile = await ensureWorkplaceAssigned(existingProfile, signInData.user.id);
 
   return {
     user: signInData.user,
@@ -313,14 +321,27 @@ export async function getCurrentSessionAndProfile() {
     .from('profiles')
     .select('*, workplaces(name)')
     .eq('id', session.user.id)
-    .single();
+    .maybeSingle();
 
-  const finalProfile = await ensureWorkplaceAssigned(profile || {
+  if (!profile) {
+    // If no profile exists, check if it's the admin. 
+    // If not, this means the user was deleted from the profiles table.
+    // They should be logged out immediately to avoid zombie accounts.
+    if (!session.user.email?.includes('admin')) {
+      await supabase.auth.signOut();
+      return null;
+    }
+  }
+
+  // Only auto-recreate for admin. For employees, profile must exist.
+  const profileToUse = profile || {
     id: session.user.id,
-    full_name: session.user.email.split('@')[0],
-    role: 'employee',
-    status: 'pending'
-  }, session.user.id);
+    full_name: session.user.email?.split('@')[0] || 'Admin',
+    role: 'admin',
+    status: 'active'
+  };
+
+  const finalProfile = await ensureWorkplaceAssigned(profileToUse, session.user.id);
 
   return {
     session,

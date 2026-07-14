@@ -304,6 +304,9 @@ export default function EmployeeHistoryModal({ employee, onClose }) {
                 <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 shrink-0">
                   {employee.role || 'Employé'}
                 </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-slate-700/50 text-slate-300 border border-slate-600/50 shrink-0">
+                  {(employee.work_site || 'depot') === 'depot' ? '📦 Dépôt' : (employee.work_site === 'atelier' ? '🛠️ Atelier' : '🏪 Magasin')}
+                </span>
               </div>
               <div className="text-[11px] sm:text-xs text-slate-300 font-medium mt-1 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3 truncate">
                 <span className="truncate">📞 {employee.phone || 'Non renseigné'}</span>

@@ -17,20 +17,17 @@ export default function AdminDashboard({ user, profile, onLogout }) {
   const [attendanceSubTab, setAttendanceSubTab] = useState('summary'); // 'summary' | 'logs'
   const [presenceFilter, setPresenceFilter] = useState('ALL'); // 'ALL' | 'present' | 'absent'
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null);
+  const [siteFilter, setSiteFilter] = useState('ALL'); // 'ALL' | 'depot' | 'atelier' | 'magasin'
+  const [validationSites, setValidationSites] = useState({});
 
   // Get YYYY-MM-DD specifically in Algeria/Chlef timezone (Africa/Algiers, UTC+1)
-  const getAlgiersDateString = (date = new Date()) => {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Africa/Algiers',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    const parts = formatter.formatToParts(date);
-    const year = parts.find(p => p.type === 'year').value;
-    const month = parts.find(p => p.type === 'month').value;
-    const day = parts.find(p => p.type === 'day').value;
-    return `${year}-${month}-${day}`;
+  const getAlgiersDateString = (dateObj) => {
+    // Algiers is UTC+1. Get the UTC time, add 1 hour, and return the ISO date part.
+    // This is 100% cross-browser compatible and guarantees YYYY-MM-DD.
+    const utcTime = dateObj.getTime();
+    const algiersTime = utcTime + (3600 * 1000);
+    const d = new Date(algiersTime);
+    return d.toISOString().split('T')[0];
   };
 
   const getTodayString = () => getAlgiersDateString(new Date());
@@ -69,8 +66,9 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
       if (lErr) throw lErr;
       setAttendanceLogs(logs || []);
-    } catch (e) {
-      console.error('Admin fetch error:', e);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      alert('Erreur fetchData: ' + (error.message || error));
     } finally {
       setLoading(false);
     }
@@ -108,10 +106,15 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
   // 2. Validate / Approve Pending Employee
   const handleValidateEmployee = async (empId, empName) => {
+    const selectedSite = validationSites[empId];
+    if (!selectedSite) {
+      alert("Veuillez sélectionner un site (Dépôt, Atelier ou Magasin) avant de valider cet employé.");
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .update({ status: 'active' })
+        .update({ status: 'active', work_site: selectedSite })
         .eq('id', empId)
         .select();
 
@@ -125,6 +128,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       fetchData();
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
+      alert(`Erreur de validation : ${e.message}`);
       setActionMessage({ type: 'error', text: `Erreur de validation : ${e.message}` });
     }
   };
@@ -145,6 +149,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       fetchData();
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
+      alert(`Erreur : ${e.message}`);
       setActionMessage({ type: 'error', text: `Erreur : ${e.message}` });
     }
   };
@@ -163,6 +168,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
       fetchData();
       setTimeout(() => setActionMessage(null), 5000);
     } catch (e) {
+      alert(`Erreur de suppression : ${e.message}`);
       setActionMessage({ type: 'error', text: `Erreur de suppression : ${e.message}` });
     }
   };
@@ -215,8 +221,13 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     const matchesSearch = (emp.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (emp.phone || '').includes(searchTerm) ||
                           (emp.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    if (filterStatus === 'ALL') return matchesSearch;
-    return matchesSearch && emp.status === filterStatus;
+    
+    const matchesStatus = filterStatus === 'ALL' || emp.status === filterStatus;
+    // For older entries where work_site might be null, treat them as 'depot' in the UI
+    const empSite = emp.work_site || 'depot';
+    const matchesSite = siteFilter === 'ALL' || empSite === siteFilter;
+
+    return matchesSearch && matchesStatus && matchesSite;
   });
 
   const pendingCount = employees.filter(e => e.status === 'pending').length;
@@ -277,6 +288,9 @@ export default function AdminDashboard({ user, profile, onLogout }) {
     // Backwards compatibility if presenceFilter was 'present'
     if (presenceFilter === 'present') return emp.currentStatus !== 'absent';
     return true;
+  }).filter(emp => {
+    const empSite = emp.work_site || 'depot';
+    return siteFilter === 'ALL' || empSite === siteFilter;
   });
 
   if (loading) {
@@ -423,6 +437,16 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                 <option value="pending">⏳ En attente ({pendingCount})</option>
                 <option value="active">✅ Actifs ({employees.filter(e => e.status === 'active').length})</option>
               </select>
+              <select
+                value={siteFilter}
+                onChange={(e) => setSiteFilter(e.target.value)}
+                className="w-full sm:w-auto py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="ALL">Tous les sites</option>
+                <option value="depot">📦 Dépôt</option>
+                <option value="atelier">🛠️ Atelier</option>
+                <option value="magasin">🏪 Magasin</option>
+              </select>
             </div>
           {/* Mobile Card View (hidden on desktop: block md:hidden) */}
           <div className="block md:hidden space-y-4">
@@ -446,18 +470,40 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs py-2 border-y border-slate-200/60">
+                <div className="flex items-center justify-between text-xs py-2 border-y border-slate-200/60 flex-wrap gap-2">
                   <span className="text-slate-500 font-medium">Rôle : <strong className="text-slate-700">{emp.role === 'admin' ? '👑 Admin' : '📱 Employé'}</strong></span>
                   <span className="text-slate-500 font-medium">Appareil : {emp.bound_device_id ? <strong className="text-teal-700">🔒 Lié</strong> : <strong className="text-slate-400">Non lié</strong>}</span>
+                  <span className="text-slate-500 font-medium w-full">Site : <strong className="text-slate-700 uppercase">{(emp.work_site || 'depot') === 'depot' ? '📦 Dépôt' : (emp.work_site === 'atelier' ? '🛠️ Atelier' : '🏪 Magasin')}</strong></span>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 flex-wrap pt-1">
+                <div className="flex flex-col gap-2 pt-1">
                   {emp.status === 'pending' && (
-                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }} className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
-                      <Check className="w-4 h-4" />
-                      <span>Valider</span>
-                    </button>
+                    <div className="flex items-center gap-2 w-full">
+                      <select
+                        value={validationSites[emp.id] || ''}
+                        onChange={(e) => setValidationSites({ ...validationSites, [emp.id]: e.target.value })}
+                        className="flex-1 py-2 px-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none"
+                      >
+                        <option value="" disabled>Saisir Site</option>
+                        <option value="depot">📦 Dépôt</option>
+                        <option value="atelier">🛠️ Atelier</option>
+                        <option value="magasin">🏪 Magasin</option>
+                      </select>
+                      <button 
+                        disabled={!validationSites[emp.id]}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }} 
+                        className={`flex-1 py-2 px-3 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 ${
+                          !validationSites[emp.id]
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        }`}
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Valider</span>
+                      </button>
+                    </div>
                   )}
+                  <div className="flex items-center justify-end gap-2 flex-wrap w-full">
                   {emp.status === 'active' && (
                     <button onClick={() => handleSuspendEmployee(emp.id, emp.full_name)} className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95">
                       <Ban className="w-4 h-4" />
@@ -474,6 +520,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     <Trash2 className="w-4 h-4" />
                     <span>Supprimer</span>
                   </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -515,11 +562,16 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                     </td>
 
                     <td className="py-4 px-4">
-                      <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
-                        emp.role === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {emp.role === 'admin' ? '👑 Admin' : '📱 Employé'}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase w-fit ${
+                          emp.role === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {emp.role === 'admin' ? '👑 Admin' : '📱 Employé'}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase">
+                          {(emp.work_site || 'depot') === 'depot' ? '📦 Dépôt' : (emp.work_site === 'atelier' ? '🛠️ Atelier' : '🏪 Magasin')}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="py-4 px-4">
@@ -548,14 +600,31 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                         
                         {/* VALIDATE / APPROVE BUTTON FOR PENDING EMPLOYEES */}
                         {emp.status === 'pending' && (
-                          <button
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition-all shadow-sm flex items-center gap-1"
-                            title="Autoriser cet employé à scanner"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Valider</span>
-                          </button>
+                          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                            <select
+                              value={validationSites[emp.id] || ''}
+                              onChange={(e) => setValidationSites({ ...validationSites, [emp.id]: e.target.value })}
+                              className="py-1 px-2 bg-white border border-slate-300 rounded-lg text-xs font-bold focus:outline-none"
+                            >
+                              <option value="" disabled>Saisir Site</option>
+                              <option value="depot">📦 Dépôt</option>
+                              <option value="atelier">🛠️ Atelier</option>
+                              <option value="magasin">🏪 Magasin</option>
+                            </select>
+                            <button
+                              disabled={!validationSites[emp.id]}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleValidateEmployee(emp.id, emp.full_name); }}
+                              className={`px-2.5 py-1.5 font-black rounded-lg text-xs transition-all flex items-center gap-1 ${
+                                !validationSites[emp.id]
+                                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                              }`}
+                              title="Autoriser cet employé à scanner"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Valider</span>
+                            </button>
+                          </div>
                         )}
 
                         {/* SUSPEND / STOP BUTTON FOR ACTIVE EMPLOYEES */}
@@ -652,6 +721,17 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   className="w-full sm:w-auto py-1.5 px-3 bg-white border-2 border-emerald-500 text-emerald-900 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm font-mono"
                 />
               )}
+
+              <select
+                value={siteFilter}
+                onChange={(e) => setSiteFilter(e.target.value)}
+                className="w-full sm:w-auto py-2 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="ALL">Tous les sites</option>
+                <option value="depot">📦 Dépôt</option>
+                <option value="atelier">🛠️ Atelier</option>
+                <option value="magasin">🏪 Magasin</option>
+              </select>
             </div>
           </div>
 
@@ -662,64 +742,78 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
 
               {/* Mobile Card View for Summary (hidden on desktop: block md:hidden) */}
-              <div className="block md:hidden space-y-3">
-                {filteredSummary.map((emp) => (
-                  <div
-                    key={emp.id}
-                    onClick={() => setSelectedEmployeeForHistory(emp)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
-                      emp.currentStatus === 'absent' ? 'bg-rose-50/70 border-rose-200' :
-                      emp.currentStatus === 'out' ? 'bg-amber-50/50 border-amber-200' :
-                      emp.currentStatus === 'weekend' ? 'bg-sky-50/50 border-sky-200' :
-                      'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full shrink-0 ${
-                          emp.currentStatus === 'in' ? 'bg-emerald-500 animate-pulse' :
-                          emp.currentStatus === 'out' ? 'bg-amber-500' :
-                          emp.currentStatus === 'weekend' ? 'bg-sky-500' :
-                          'bg-rose-500'
-                        }`}></div>
-                        <div>
-                          <div className="font-extrabold text-slate-900 text-sm underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</div>
-                          <div className="font-mono text-xs text-slate-500 font-bold">{emp.phone || emp.email || '---'}</div>
-                        </div>
-                      </div>
-                      <div>
-                        {emp.currentStatus === 'in' ? (
-                          <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 block text-center">
-                            🟢 EN POSTE
-                          </span>
-                        ) : emp.currentStatus === 'out' ? (
-                          <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300 block text-center">
-                            🟡 SORTI(E)
-                          </span>
-                        ) : emp.currentStatus === 'weekend' ? (
-                          <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300 block text-center">
-                            🌴 REPOS
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300 block text-center">
-                            🔴 ABSENT(E)
-                          </span>
+              <div className="block md:hidden space-y-4">
+                {[{id: 'depot', label: '📦 Dépôt'}, {id: 'atelier', label: '🛠️ Atelier'}, {id: 'magasin', label: '🏪 Magasin'}]
+                  .filter(site => siteFilter === 'ALL' || siteFilter === site.id)
+                  .map(site => {
+                    const siteEmps = filteredSummary.filter(emp => (emp.work_site || 'depot') === site.id);
+                    if (siteEmps.length === 0) return null;
+                    return (
+                      <div key={site.id} className="space-y-3">
+                        {siteFilter === 'ALL' && (
+                          <h4 className="text-[11px] font-black text-slate-700 uppercase px-1 border-b border-slate-200/80 pb-1 mt-4">{site.label}</h4>
                         )}
-                      </div>
-                    </div>
+                        {siteEmps.map((emp) => (
+                          <div
+                            key={emp.id}
+                            onClick={() => setSelectedEmployeeForHistory(emp)}
+                            className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
+                              emp.currentStatus === 'absent' ? 'bg-rose-50/70 border-rose-200' :
+                              emp.currentStatus === 'out' ? 'bg-amber-50/50 border-amber-200' :
+                              emp.currentStatus === 'weekend' ? 'bg-sky-50/50 border-sky-200' :
+                              'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-3 h-3 rounded-full shrink-0 ${
+                                  emp.currentStatus === 'in' ? 'bg-emerald-500 animate-pulse' :
+                                  emp.currentStatus === 'out' ? 'bg-amber-500' :
+                                  emp.currentStatus === 'weekend' ? 'bg-sky-500' :
+                                  'bg-rose-500'
+                                }`}></div>
+                                <div>
+                                  <div className="font-extrabold text-slate-900 text-sm underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</div>
+                                  <div className="font-mono text-xs text-slate-500 font-bold">{emp.phone || emp.email || '---'}</div>
+                                </div>
+                              </div>
+                              <div>
+                                {emp.currentStatus === 'in' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 block text-center">
+                                    🟢 EN POSTE
+                                  </span>
+                                ) : emp.currentStatus === 'out' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300 block text-center">
+                                    🟡 SORTI(E)
+                                  </span>
+                                ) : emp.currentStatus === 'weekend' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300 block text-center">
+                                    🌴 REPOS
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300 block text-center">
+                                    🔴 ABSENT(E)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs font-mono">
-                      <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col">
-                        <span className="text-[10px] text-slate-400 font-sans font-bold">1ère Entrée</span>
-                        <span className="font-bold text-emerald-700">{emp.firstInTime || '--:--'}</span>
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs font-mono">
+                              <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col">
+                                <span className="text-[10px] text-slate-400 font-sans font-bold">1ère Entrée</span>
+                                <span className="font-bold text-emerald-700">{emp.firstInTime || '--:--'}</span>
+                              </div>
+                              <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col">
+                                <span className="text-[10px] text-slate-400 font-sans font-bold">Dernière Sortie</span>
+                                <span className="font-bold text-indigo-700">{emp.lastOutTime || '--:--'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col">
-                        <span className="text-[10px] text-slate-400 font-sans font-bold">Dernière Sortie</span>
-                        <span className="font-bold text-indigo-700">{emp.lastOutTime || '--:--'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })
+                }
                 {filteredSummary.length === 0 && (
                   <div className="py-8 text-center text-slate-400 font-medium bg-slate-50 rounded-2xl">
                     Aucun employé dans cette catégorie pour le {selectedDate}.
@@ -739,75 +833,93 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                       <th className="py-3 px-4">Dernière Sortie</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                    {filteredSummary.map((emp) => (
-                      <tr
-                        key={emp.id}
-                        onClick={() => setSelectedEmployeeForHistory(emp)}
-                        title="👉 Cliquez pour voir l'historique et la chronologie 24h détaillée"
-                        className={`hover:bg-indigo-50/60 cursor-pointer transition-all ${
-                          emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
-                          emp.currentStatus === 'out' ? 'bg-amber-50/30' :
-                          emp.currentStatus === 'weekend' ? 'bg-sky-50/40' : ''
-                        }`}
-                      >
-                        <td className="py-3.5 px-4 font-bold text-slate-900">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${
-                              emp.currentStatus === 'in' ? 'bg-emerald-500' :
-                              emp.currentStatus === 'out' ? 'bg-amber-500' :
-                              emp.currentStatus === 'weekend' ? 'bg-sky-500' :
-                              'bg-rose-500 animate-pulse'
-                            }`}></div>
-                            <span className="group-hover:text-indigo-600 underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-600">
-                          {emp.phone || emp.email || '---'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {emp.currentStatus === 'in' ? (
-                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              🟢 EN POSTE (Présent)
-                            </span>
-                          ) : emp.currentStatus === 'out' ? (
-                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300">
-                              🟡 SORTI(E)
-                            </span>
-                          ) : emp.currentStatus === 'weekend' ? (
-                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300">
-                              🌴 REPOS
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300">
-                              🔴 ABSENT(E) (Aucun pointage)
-                            </span>
+                  {[{id: 'depot', label: '📦 Dépôt'}, {id: 'atelier', label: '🛠️ Atelier'}, {id: 'magasin', label: '🏪 Magasin'}]
+                    .filter(site => siteFilter === 'ALL' || siteFilter === site.id)
+                    .map(site => {
+                      const siteEmps = filteredSummary.filter(emp => (emp.work_site || 'depot') === site.id);
+                      if (siteEmps.length === 0) return null;
+                      return (
+                        <tbody key={site.id} className="divide-y divide-slate-100 text-xs font-medium">
+                          {siteFilter === 'ALL' && (
+                            <tr>
+                              <td colSpan="5" className="py-2.5 px-4 bg-slate-50 text-[11px] font-black text-slate-700 uppercase border-y border-slate-200 shadow-sm">
+                                {site.label}
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
-                          {emp.firstInTime ? (
-                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{emp.firstInTime}</span>
-                          ) : (
-                            <span className="text-slate-400">--:--</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
-                          {emp.lastOutTime ? (
-                            <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{emp.lastOutTime}</span>
-                          ) : (
-                            <span className="text-slate-400">--:--</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredSummary.length === 0 && (
+                          {siteEmps.map((emp) => (
+                            <tr
+                              key={emp.id}
+                              onClick={() => setSelectedEmployeeForHistory(emp)}
+                              title="👉 Cliquez pour voir l'historique et la chronologie 24h détaillée"
+                              className={`hover:bg-indigo-50/60 cursor-pointer transition-all ${
+                                emp.currentStatus === 'absent' ? 'bg-rose-50/40' :
+                                emp.currentStatus === 'out' ? 'bg-amber-50/30' :
+                                emp.currentStatus === 'weekend' ? 'bg-sky-50/40' : ''
+                              }`}
+                            >
+                              <td className="py-3.5 px-4 font-bold text-slate-900">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${
+                                    emp.currentStatus === 'in' ? 'bg-emerald-500' :
+                                    emp.currentStatus === 'out' ? 'bg-amber-500' :
+                                    emp.currentStatus === 'weekend' ? 'bg-sky-500' :
+                                    'bg-rose-500 animate-pulse'
+                                  }`}></div>
+                                  <span className="group-hover:text-indigo-600 underline decoration-dotted decoration-indigo-300">{emp.full_name || 'Inconnu'}</span>
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-slate-600">
+                                {emp.phone || emp.email || '---'}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                {emp.currentStatus === 'in' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    🟢 EN POSTE (Présent)
+                                  </span>
+                                ) : emp.currentStatus === 'out' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                                    🟡 SORTI(E)
+                                  </span>
+                                ) : emp.currentStatus === 'weekend' ? (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-sky-100 text-sky-800 border border-sky-300">
+                                    🌴 REPOS
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full font-extrabold text-[10px] uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                                    🔴 ABSENT(E) (Aucun pointage)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
+                                {emp.firstInTime ? (
+                                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{emp.firstInTime}</span>
+                                ) : (
+                                  <span className="text-slate-400">--:--</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-slate-700 font-bold">
+                                {emp.lastOutTime ? (
+                                  <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{emp.lastOutTime}</span>
+                                ) : (
+                                  <span className="text-slate-400">--:--</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      );
+                    })
+                  }
+                  {filteredSummary.length === 0 && (
+                    <tbody>
                       <tr>
                         <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">
                           Aucun employé dans cette catégorie pour le {selectedDate}.
                         </td>
                       </tr>
-                    )}
-                  </tbody>
+                    </tbody>
+                  )}
                 </table>
               </div>
             </div>
