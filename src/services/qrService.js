@@ -12,11 +12,39 @@ async function sha256(message) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+let timeOffset = 0;
+let timeSynced = false;
+
+/**
+ * Synchronizes the client clock with the Supabase server clock
+ */
+export async function syncClockWithServer() {
+  if (timeSynced) return;
+  try {
+    const { supabaseUrl, supabaseAnonKey } = await import('../lib/supabase');
+    const start = Date.now();
+    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'HEAD',
+      headers: { apikey: supabaseAnonKey }
+    });
+    const serverDate = res.headers.get('date');
+    if (serverDate) {
+      const serverTime = new Date(serverDate).getTime();
+      const latency = (Date.now() - start) / 2;
+      timeOffset = (serverTime + latency) - Date.now();
+      timeSynced = true;
+      console.log('Clock synced with server. Offset:', timeOffset, 'ms');
+    }
+  } catch (e) {
+    console.error('Failed to sync clock with server:', e);
+  }
+}
+
 /**
  * Returns the current Epoch for 30-second intervals (changes automatically every 30 seconds)
  */
 export function getCurrentEpoch30s() {
-  return Math.floor(Date.now() / 30000);
+  return Math.floor((Date.now() + timeOffset) / 30000);
 }
 
 /**
@@ -48,6 +76,9 @@ export async function generateDynamicQR(workplaceId, secret, epoch30s = getCurre
  * to prevent false rejections during network lag or slight clock differences.
  */
 export async function validateQRToken(workplaceId, secret, scannedTokenString) {
+  // Sync clock dynamically before validation to handle client clock drift
+  await syncClockWithServer();
+
   if (!scannedTokenString || !scannedTokenString.startsWith('PYJAMA-QR|')) {
     return {
       valid: false,
