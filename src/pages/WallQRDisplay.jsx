@@ -257,16 +257,6 @@ export default function WallQRDisplay() {
             includeMargin={false}
             className="block transition-all duration-300"
           />
-          
-          {modelsReady && (
-            <button 
-              onClick={() => setCameraActive(true)}
-              className="flex items-center gap-4 px-10 py-5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:scale-105 active:scale-95 rounded-full font-black text-2xl transition-all shadow-sm border-2 border-indigo-200"
-            >
-              <ScanFace className="w-10 h-10" />
-              T'pointi bel Wjeh (Reconnaissance Faciale)
-            </button>
-          )}
         </div>
       ) : null}
     </div>

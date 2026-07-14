@@ -11,6 +11,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
   const [scanResult, setScanResult] = useState(null);
   const [error, setError] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
   
   // Today's summary state
   const [summary, setSummary] = useState({
@@ -82,7 +83,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
   };
 
   // 3. Start Camera Scanner (< 3 seconds target)
-  const startScanner = async () => {
+  const startScanner = async (mode = facingMode) => {
     setError(null);
     setScanResult(null);
     setIsScanning(true);
@@ -93,7 +94,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
       html5QrCodeRef.current = scanner;
 
       await scanner.start(
-        { facingMode: 'environment' },
+        { facingMode: mode },
         {
           fps: 15,
           qrbox: { width: 260, height: 260 },
@@ -123,6 +124,18 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
       }
     }
     setIsScanning(false);
+  };
+
+  const toggleCamera = async () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextMode);
+    if (isScanning) {
+      await stopScanner();
+      // start again with the new mode
+      setTimeout(() => {
+        startScanner(nextMode);
+      }, 300);
+    }
   };
 
   // 4. Process Scanned QR Token
@@ -384,7 +397,7 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
               <div className="w-full max-w-sm space-y-3">
                 {!isScanning ? (
                   <button
-                    onClick={startScanner}
+                    onClick={() => startScanner(facingMode)}
                     disabled={loadingAction}
                     className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-sm sm:text-base transition-all shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 active:scale-95"
                   >
@@ -392,13 +405,22 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
                     <span>📷 Ouvrir Caméra Scanner</span>
                   </button>
                 ) : (
-                  <button
-                    onClick={stopScanner}
-                    className="w-full py-4 px-6 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-sm sm:text-base transition-all shadow-lg shadow-red-600/25 flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <CameraOff className="w-5 h-5 shrink-0" />
-                    <span>🛑 Fermer Caméra</span>
-                  </button>
+                  <div className="flex gap-3 w-full">
+                    <button
+                      onClick={stopScanner}
+                      className="flex-1 py-4 px-4 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-red-600/25 flex items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <CameraOff className="w-4 h-4 shrink-0" />
+                      <span>Fermer</span>
+                    </button>
+                    <button
+                      onClick={toggleCamera}
+                      className="flex-1 py-4 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <RefreshCw className="w-4 h-4 shrink-0" />
+                      <span>Caméra {facingMode === 'environment' ? 'Devant' : 'Derrière'}</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
