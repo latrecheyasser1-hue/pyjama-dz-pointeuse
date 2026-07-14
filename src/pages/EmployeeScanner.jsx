@@ -32,10 +32,6 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
         setSummary(sum);
         const info = getDeviceInfo();
         setDeviceInfo(info);
-        
-        // Sync clock with server to handle clock drift
-        const { syncClockWithServer } = await import('../services/qrService');
-        await syncClockWithServer();
       } catch (e) {
         console.error('Init error:', e);
       }
