@@ -24,11 +24,14 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const html5QrCodeRef = useRef(null);
 
-  // 1. Fetch Today Summary & Device Info
+  // 1. Fetch Today Summary & Device Info + Preload Camera Scanner Module
   useEffect(() => {
     async function init() {
       if (!user) return;
       try {
+        // Preload QR Scanner library in background so opening camera is 100% instant!
+        import('html5-qrcode').catch(() => {});
+
         const sum = await getTodaySummary(user.id);
         setSummary(sum);
         const info = getDeviceInfo();

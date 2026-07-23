@@ -181,11 +181,13 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4 text-slate-900 font-sans">
-        <div className="w-12 h-12 border-4 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin"></div>
-        <p className="text-slate-600 text-sm font-bold animate-pulse">
-          Chargement de Pyjama DZ Pointeuse...
-        </p>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 text-center font-sans">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-600/30 mb-5 animate-pulse">
+          DZ
+        </div>
+        <div className="w-9 h-9 border-4 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin mb-4"></div>
+        <div className="text-sm font-extrabold text-slate-900">Pyjama DZ Pointeuse</div>
+        <div className="text-xs font-semibold text-slate-500 mt-1">Connexion sécurisée en cours...</div>
       </div>
     );
   }
