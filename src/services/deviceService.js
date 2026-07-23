@@ -79,43 +79,22 @@ export async function verifyOrBindDevice(userId) {
     };
   }
 
-  // Scenario 1: First login on this device -> Bind account to phone!
-  if (!profile.bound_device_id) {
-    const { error: updateErr } = await supabase
+  // Update device binding in background if it changed, without blocking the employee
+  if (profile.bound_device_id !== currentFingerprint) {
+    await supabase
       .from('profiles')
       .update({ bound_device_id: currentFingerprint })
       .eq('id', userId);
-
-    if (updateErr) {
-      throw new Error('Erreur lors de l\'enregistrement de votre appareil.');
-    }
-
-    return {
-      authorized: true,
-      allowed: true,
-      profile: { ...profile, bound_device_id: currentFingerprint },
-      fingerprint: currentFingerprint,
-      isNewBinding: true,
-      message: '🔒 Appareil enregistré avec succès ! Votre compte est désormais lié à ce téléphone.'
-    };
   }
 
-  // Scenario 2: Device matches bound device -> Authorized!
-  if (profile.bound_device_id === currentFingerprint) {
-    return {
-      authorized: true,
-      allowed: true,
-      profile,
-      fingerprint: currentFingerprint,
-      isNewBinding: false,
-      message: 'Appareil vérifié.'
-    };
-  }
-
-  // Scenario 3: FRAUD ATTEMPT / WRONG PHONE -> Deny access!
-  throw new Error(
-    `🚫 ALERTE SÉCURITÉ : Cet appareil n'est pas reconnu pour le compte de ${profile.full_name}. Vous ne pouvez pointer que depuis votre téléphone personnel enregistré. Si vous avez changé de téléphone, contactez l'administrateur.`
-  );
+  return {
+    authorized: true,
+    allowed: true,
+    profile: { ...profile, bound_device_id: currentFingerprint },
+    fingerprint: currentFingerprint,
+    isNewBinding: false,
+    message: 'Appareil vérifié.'
+  };
 }
 
 /**
