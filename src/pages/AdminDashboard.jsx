@@ -472,8 +472,7 @@ export default function AdminDashboard({ user, profile, onLogout }) {
 
                 <div className="flex items-center justify-between text-xs py-2 border-y border-slate-200/60 flex-wrap gap-2">
                   <span className="text-slate-500 font-medium">Rôle : <strong className="text-slate-700">{emp.role === 'admin' ? '👑 Admin' : '📱 Employé'}</strong></span>
-                  <span className="text-slate-500 font-medium">Appareil : {emp.bound_device_id ? <strong className="text-teal-700">🔒 Lié</strong> : <strong className="text-slate-400">Non lié</strong>}</span>
-                  <span className="text-slate-500 font-medium w-full">Site : <strong className="text-slate-700 uppercase">{(emp.work_site || 'depot') === 'depot' ? '📦 Dépôt' : (emp.work_site === 'atelier' ? '🛠️ Atelier' : '🏪 Magasin')}</strong></span>
+                  <span className="text-slate-500 font-medium">Site : <strong className="text-slate-700 uppercase">{(emp.work_site || 'depot') === 'depot' ? '📦 Dépôt' : (emp.work_site === 'atelier' ? '🛠️ Atelier' : '🏪 Magasin')}</strong></span>
                 </div>
 
                 <div className="flex flex-col gap-2 pt-1">
@@ -510,12 +509,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                       <span>Bloquer</span>
                     </button>
                   )}
-                  {emp.bound_device_id && (
-                    <button onClick={() => handleUnlockDevice(emp.id, emp.full_name)} className="py-2 px-3 bg-white hover:bg-blue-50 text-slate-700 border border-slate-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 active:scale-95">
-                      <Unlock className="w-4 h-4" />
-                      <span>Appareil</span>
-                    </button>
-                  )}
                   <button onClick={() => handleDeleteEmployee(emp.id, emp.full_name)} className="py-2 px-3 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 active:scale-95">
                     <Trash2 className="w-4 h-4" />
                     <span>Supprimer</span>
@@ -540,7 +533,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                   <th className="py-3 px-4">Téléphone / ID</th>
                   <th className="py-3 px-4">Rôle</th>
                   <th className="py-3 px-4">Statut</th>
-                  <th className="py-3 px-4">Appareil Lié</th>
                   <th className="py-3 px-4 text-right">Actions Direction</th>
                 </tr>
               </thead>
@@ -585,16 +577,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                       </span>
                     </td>
 
-                    <td className="py-4 px-4 font-mono text-slate-500">
-                      {emp.bound_device_id ? (
-                        <span className="text-teal-700 font-bold bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                          🔒 Lié ({emp.bound_device_id.slice(0, 8)}...)
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">Non lié</span>
-                      )}
-                    </td>
-
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         
@@ -636,18 +618,6 @@ export default function AdminDashboard({ user, profile, onLogout }) {
                           >
                             <Ban className="w-3.5 h-3.5" />
                             <span>Bloquer / Stop</span>
-                          </button>
-                        )}
-
-                        {/* UNLOCK DEVICE BUTTON */}
-                        {emp.bound_device_id && (
-                          <button
-                            onClick={() => handleUnlockDevice(emp.id, emp.full_name)}
-                            className="px-2 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-300 hover:border-blue-300 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
-                            title="Réinitialiser l'appareil lié de l'employé"
-                          >
-                            <Unlock className="w-3.5 h-3.5" />
-                            <span>🔓 Appareil</span>
                           </button>
                         )}
 

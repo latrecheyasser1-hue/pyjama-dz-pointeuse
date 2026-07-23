@@ -312,8 +312,6 @@ export default function EmployeeScanner({ user, profile, onLogout }) {
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-1 text-xs text-slate-500">
                     <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="font-mono font-bold text-slate-700">Tél : {profile?.phone || '---'}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="text-slate-500">Appareil lié & sécurisé</span>
                   </div>
                 </div>
               </div>
